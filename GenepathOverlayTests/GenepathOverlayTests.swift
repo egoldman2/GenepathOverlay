@@ -1,0 +1,17 @@
+//
+//  GenepathOverlayTests.swift
+//  GenepathOverlayTests
+//
+//  Created by Ethan on 17/3/2026.
+//
+
+import Testing
+@testable import GenepathOverlay
+
+struct GenepathOverlayTests {
+
+    @Test func example() async throws {
+        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
+    }
+
+}
