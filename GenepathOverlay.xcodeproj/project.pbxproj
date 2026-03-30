@@ -179,12 +179,22 @@
 			productRefGroup = AA9E19582F691094009165AF /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
+			packageReferences = (
+				AA9E195E2F691094009165AF /* XCLocalSwiftPackageReference "Packages/RealityKitContent" */,
+			);
 			targets = (
 				AA9E19562F691094009165AF /* GenepathOverlay */,
 				AA9E196A2F691096009165AF /* GenepathOverlayTests */,
 			);
 		};
 /* End PBXProject section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA9E195E2F691094009165AF /* XCLocalSwiftPackageReference "Packages/RealityKitContent" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/RealityKitContent;
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin PBXResourcesBuildPhase section */
 		AA9E19552F691094009165AF /* Resources */ = {
@@ -489,6 +499,7 @@
 /* Begin XCSwiftPackageProductDependency section */
 		AA9E195C2F691094009165AF /* RealityKitContent */ = {
 			isa = XCSwiftPackageProductDependency;
+			package = AA9E195E2F691094009165AF /* XCLocalSwiftPackageReference "Packages/RealityKitContent" */;
 			productName = RealityKitContent;
 		};
 /* End XCSwiftPackageProductDependency section */
