@@ -37,6 +37,9 @@ class AppModel {
         csvParser = CSVParser(coordinateMapper: mapper)
         validationEngine = ValidationEngine()
         trackingManager = TrackingManager(coordinateMapper: mapper)
+        trackingManager.onStateChange = { [weak self] in
+            self?.syncTrackingSnapshot()
+        }
         uiState.prepareForLaunch()
         trackingManager.startTracking()
         trackingSnapshot = trackingManager.snapshot
@@ -82,6 +85,27 @@ class AppModel {
 
     var trackingMessage: String {
         trackingSnapshot.status.message
+    }
+
+    var bundledReferenceObjectsLabel: String {
+        let names = trackingManager.bundledReferenceObjectNames
+        guard !names.isEmpty else {
+            return "No bundled reference objects"
+        }
+        return names.joined(separator: ", ")
+    }
+
+    var trackedPlatesLabel: String {
+        let trackedPlates = trackingSnapshot.plateAnchors.values
+            .filter { $0.confidence > 0.95 }
+            .map { $0.plate.title }
+            .sorted()
+
+        guard !trackedPlates.isEmpty else {
+            return "No live plate anchors yet"
+        }
+
+        return trackedPlates.joined(separator: ", ")
     }
 
     var isPreviewTracking: Bool {

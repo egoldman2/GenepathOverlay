@@ -16,7 +16,7 @@ struct ValidationEngine {
         trackingStatus: TrackingStatus
     ) -> ValidationResult {
         switch trackingStatus {
-        case .idle, .preparing:
+        case .idle, .preparing, .searching:
             return .blocked("Tracking is not ready yet.")
         case .paused(let message), .lowConfidence(let message), .unavailable(let message):
             return .blocked(message)

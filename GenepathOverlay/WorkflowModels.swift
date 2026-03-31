@@ -124,6 +124,7 @@ enum TrackingStatus: Sendable {
     case idle
     case preparing
     case preview(String)
+    case searching(String)
     case tracking
     case paused(String)
     case lowConfidence(String)
@@ -136,6 +137,7 @@ enum TrackingStatus: Sendable {
         case .preparing:
             return "Preparing tracking session."
         case .preview(let message),
+             .searching(let message),
              .paused(let message),
              .lowConfidence(let message),
              .unavailable(let message):
@@ -148,7 +150,10 @@ enum TrackingStatus: Sendable {
 
 struct PlateAnchorState: Sendable {
     let plate: PlateID
+    var transform: simd_float4x4
     var position: SIMD3<Float>
+    var localBoundsCenter: SIMD3<Float>
+    var localBoundsExtent: SIMD3<Float>
     var confidence: Float
 }
 
