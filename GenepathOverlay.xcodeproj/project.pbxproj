@@ -27,7 +27,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		AA9E19712F691096009165AF /* Exceptions for "GenepathOverlay" folder in "GenepathOverlay" target */ = {
+		AA838A9E2F7B8155009F27AF /* Exceptions for "GenepathOverlay" folder in "GenepathOverlay" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
@@ -37,10 +37,15 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		AA838A9D2F7B8155009F27AF /* ReferenceObjects */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ReferenceObjects;
+			sourceTree = "<group>";
+		};
 		AA9E19592F691094009165AF /* GenepathOverlay */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				AA9E19712F691096009165AF /* Exceptions for "GenepathOverlay" folder in "GenepathOverlay" target */,
+				AA838A9E2F7B8155009F27AF /* Exceptions for "GenepathOverlay" folder in "GenepathOverlay" target */,
 			);
 			path = GenepathOverlay;
 			sourceTree = "<group>";
@@ -74,6 +79,7 @@
 		AA9E194E2F691094009165AF = {
 			isa = PBXGroup;
 			children = (
+				AA838A9D2F7B8155009F27AF /* ReferenceObjects */,
 				AA9E19592F691094009165AF /* GenepathOverlay */,
 				AA9E195A2F691094009165AF /* Packages */,
 				AA9E196E2F691096009165AF /* GenepathOverlayTests */,
@@ -114,6 +120,7 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
+				AA838A9D2F7B8155009F27AF /* ReferenceObjects */,
 				AA9E19592F691094009165AF /* GenepathOverlay */,
 			);
 			name = GenepathOverlay;
@@ -175,26 +182,19 @@
 			);
 			mainGroup = AA9E194E2F691094009165AF;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AA9E195E2F691094009165AF /* XCLocalSwiftPackageReference "Packages/RealityKitContent" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = AA9E19582F691094009165AF /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			packageReferences = (
-				AA9E195E2F691094009165AF /* XCLocalSwiftPackageReference "Packages/RealityKitContent" */,
-			);
 			targets = (
 				AA9E19562F691094009165AF /* GenepathOverlay */,
 				AA9E196A2F691096009165AF /* GenepathOverlayTests */,
 			);
 		};
 /* End PBXProject section */
-
-/* Begin XCLocalSwiftPackageReference section */
-		AA9E195E2F691094009165AF /* XCLocalSwiftPackageReference "Packages/RealityKitContent" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = Packages/RealityKitContent;
-		};
-/* End XCLocalSwiftPackageReference section */
 
 /* Begin PBXResourcesBuildPhase section */
 		AA9E19552F691094009165AF /* Resources */ = {
@@ -248,7 +248,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = SD474JC36C;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -277,7 +277,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = SD474JC36C;
 				ENABLE_PREVIEWS = YES;
-				GENERATE_INFOPLIST_FILE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "$(TARGET_NAME)/Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -495,6 +495,13 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA9E195E2F691094009165AF /* XCLocalSwiftPackageReference "Packages/RealityKitContent" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/RealityKitContent;
+		};
+/* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		AA9E195C2F691094009165AF /* RealityKitContent */ = {

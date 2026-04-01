@@ -251,6 +251,9 @@ struct ContentView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
 
+            detailItem("Reference Objects", value: appModel.bundledReferenceObjectsLabel)
+            detailItem("Tracked Plates", value: appModel.trackedPlatesLabel)
+
             if appModel.isPreviewTracking {
                 Text("Preview mode keeps the mixed reality workflow testable until trained reference objects and live pipette tracking are bundled.")
                     .font(.caption)
