@@ -28,7 +28,7 @@ struct WellTransferingView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 320)
             
-            //Image  needed custom well plate icons
+            //Image needed custom well plate icons
             HStack {
                 ZStack {
                     Image(systemName: "apps.ipad.landscape")
