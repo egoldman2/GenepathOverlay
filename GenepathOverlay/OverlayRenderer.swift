@@ -8,11 +8,16 @@ final class OverlayRenderer {
     private var plateEntities: [PlateID: Entity] = [:]
     private var outlineEdgeEntities: [PlateID: [ModelEntity]] = [:]
     private weak var workflowPanelEntity: Entity?
+    private var testPlateContainerEntity: Entity?
+    private var testPlateModelEntity: Entity?
+    private var testPlateLoadTask: Task<Void, Never>?
+    private var loadedTestPlateURL: URL?
 
     func installIfNeeded(
         content: inout RealityViewContent,
         mapper: CoordinateMapper,
-        workflowPanel: Entity? = nil
+        workflowPanel: Entity? = nil,
+        showTestPlateModel: Bool = false
     ) {
         if let rootEntity {
             if rootEntity.scene == nil {
@@ -21,6 +26,7 @@ final class OverlayRenderer {
             if let workflowPanel {
                 attachWorkflowPanelIfNeeded(workflowPanel)
             }
+            updateTestPlateVisibility(isVisible: showTestPlateModel)
             return
         }
 
@@ -39,13 +45,17 @@ final class OverlayRenderer {
         if let workflowPanel {
             attachWorkflowPanelIfNeeded(workflowPanel)
         }
+
+        installTestPlateContainerIfNeeded()
+        updateTestPlateVisibility(isVisible: showTestPlateModel)
     }
 
     func update(
         currentStep: Step?,
         currentPhase: WorkflowPhase,
         trackingSnapshot: TrackingSnapshot,
-        mapper: CoordinateMapper
+        mapper: CoordinateMapper,
+        showTestPlateModel: Bool = false
     ) {
         for plate in PlateID.allCases {
             guard let plateEntity = plateEntities[plate] else { continue }
@@ -68,6 +78,8 @@ final class OverlayRenderer {
             workflowPanelEntity.position = sourceCenter + SIMD3<Float>(-(sourceExtent.x * 0.5 + 0.08), sourceExtent.y * 0.5 + 0.05, 0)
             workflowPanelEntity.scale = SIMD3<Float>(repeating: 0.5)
         }
+
+        updateTestPlateVisibility(isVisible: showTestPlateModel)
     }
 
     private func attachWorkflowPanelIfNeeded(_ workflowPanel: Entity) {
@@ -80,6 +92,74 @@ final class OverlayRenderer {
         workflowPanel.scale = SIMD3<Float>(repeating: 0.5)
         sourcePlate.addChild(workflowPanel)
         workflowPanelEntity = workflowPanel
+    }
+
+    private func installTestPlateContainerIfNeeded() {
+        guard testPlateContainerEntity == nil, let sourcePlate = plateEntities[.source] else { return }
+
+        let container = Entity()
+        container.name = "test-plate-container"
+        container.isEnabled = false
+        sourcePlate.addChild(container)
+        testPlateContainerEntity = container
+    }
+
+    private func updateTestPlateVisibility(isVisible: Bool) {
+        installTestPlateContainerIfNeeded()
+        guard let testPlateContainerEntity else { return }
+
+        testPlateContainerEntity.isEnabled = isVisible
+
+        guard isVisible else { return }
+
+        if let testPlateModelEntity {
+            testPlateModelEntity.isEnabled = true
+            return
+        }
+
+        guard testPlateLoadTask == nil else { return }
+        guard let assetURL = TestWellPlateAssetLocator.locate() else { return }
+
+        if loadedTestPlateURL == assetURL, testPlateModelEntity != nil {
+            return
+        }
+
+        testPlateLoadTask = Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let entity = try await Entity(contentsOf: assetURL)
+                await MainActor.run {
+                    self.finishLoadingTestPlate(entity: entity, from: assetURL)
+                }
+            } catch {
+                await MainActor.run {
+                    self.testPlateLoadTask = nil
+                }
+            }
+        }
+    }
+
+    private func finishLoadingTestPlate(entity: Entity, from assetURL: URL) {
+        installTestPlateContainerIfNeeded()
+        guard let testPlateContainerEntity else {
+            testPlateLoadTask = nil
+            return
+        }
+
+        entity.name = "test-well-plate"
+        testPlateContainerEntity.addChild(entity)
+
+        // Center the loaded model on the simulated anchor so mismatched USDZ pivots
+        // do not shift the plate away from the expected tracking pose.
+        let bounds = entity.visualBounds(relativeTo: testPlateContainerEntity)
+        entity.position = -bounds.center
+        entity.orientation = simd_quatf()
+        entity.scale = SIMD3<Float>(repeating: 1)
+
+        testPlateModelEntity = entity
+        loadedTestPlateURL = assetURL
+        testPlateLoadTask = nil
     }
 
     private func makePlateEntity(for plate: PlateID, mapper: CoordinateMapper) -> Entity {

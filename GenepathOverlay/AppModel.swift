@@ -30,6 +30,12 @@ class AppModel {
     var uiState = UIStateManager()
     var sequenceEngine = SequenceEngine()
     var trackingSnapshot = TrackingSnapshot.idle
+    var isShowingTestWellPlate = false {
+        didSet {
+            trackingManager.setTestPlateSimulationEnabled(isShowingTestWellPlate)
+            syncTrackingSnapshot()
+        }
+    }
 
     init() {
         let mapper = CoordinateMapper()
@@ -98,7 +104,9 @@ class AppModel {
     var trackedPlatesLabel: String {
         let trackedPlates = trackingSnapshot.plateAnchors.values
             .filter { $0.confidence > 0.95 }
-            .map { $0.plate.title }
+            .map { anchor in
+                anchor.isSimulated ? "\(anchor.plate.title) (Simulated)" : anchor.plate.title
+            }
             .sorted()
 
         guard !trackedPlates.isEmpty else {
@@ -113,6 +121,14 @@ class AppModel {
             return true
         }
         return false
+    }
+
+    var testWellPlateModelName: String {
+        TestWellPlateAssetLocator.displayName() ?? "No bundled USDZ found"
+    }
+
+    var isTestWellPlateModelAvailable: Bool {
+        TestWellPlateAssetLocator.locate() != nil
     }
 
     var canConfirmValidation: Bool {

@@ -27,6 +27,10 @@ final class TrackingManager {
     private let coordinateMapper: CoordinateMapper
     private var objectTrackingTask: Task<Void, Never>?
     private var anchorUpdatesTask: Task<Void, Never>?
+    private var trackingStatus: TrackingStatus = .idle
+    private var basePlateAnchors: [PlateID: PlateAnchorState] = [:]
+    private var detectedToolPose: DetectedToolPose?
+    private var isTestPlateSimulationEnabled = false
     private var filters: [PlateID: MovingAverageFilter] = [
         .source: MovingAverageFilter(),
         .destination: MovingAverageFilter()
@@ -50,8 +54,9 @@ final class TrackingManager {
 
     func startTracking() {
         stopTracking()
-        snapshot.status = .preparing
-        snapshot.detectedToolPose = nil
+        trackingStatus = .preparing
+        detectedToolPose = nil
+        publishSnapshot()
         installPreviewAnchors(message: "Preparing object tracking session.")
 
         objectTrackingTask = Task { [weak self] in
@@ -67,30 +72,41 @@ final class TrackingManager {
         anchorUpdatesTask = nil
         referenceObjectAssignments = [:]
         session.stop()
-        snapshot = .idle
+        trackingStatus = .idle
+        basePlateAnchors = [:]
+        detectedToolPose = nil
+        publishSnapshot()
     }
 
     func pauseTracking(reason: String) {
-        snapshot.status = .paused(reason)
+        trackingStatus = .paused(reason)
+        publishSnapshot()
     }
 
     func clearDetection() {
-        snapshot.detectedToolPose = nil
+        detectedToolPose = nil
+        publishSnapshot()
     }
 
     func simulateDetection(for coordinate: Coordinate, mismatch: Bool = false) {
         let target = mismatch ? coordinateMapper.alternateCoordinate(for: coordinate) : coordinate
         let smoothedPosition = filters[target.plate]?.add(target.normalizedPosition) ?? target.normalizedPosition
 
-        snapshot.detectedToolPose = DetectedToolPose(
+        detectedToolPose = DetectedToolPose(
             plate: target.plate,
             position: smoothedPosition,
             confidence: 0.92
         )
+        publishSnapshot()
+    }
+
+    func setTestPlateSimulationEnabled(_ enabled: Bool) {
+        isTestPlateSimulationEnabled = enabled
+        publishSnapshot()
     }
 
     private func installPreviewAnchors(message: String) {
-        var anchors: [PlateID: PlateAnchorState] = snapshot.plateAnchors
+        var anchors: [PlateID: PlateAnchorState] = basePlateAnchors
 
         for plate in PlateID.allCases {
             let position = coordinateMapper.plateWorldPosition(for: plate)
@@ -105,11 +121,9 @@ final class TrackingManager {
             )
         }
 
-        snapshot = TrackingSnapshot(
-            status: .preview(message),
-            plateAnchors: anchors,
-            detectedToolPose: snapshot.detectedToolPose
-        )
+        trackingStatus = .preview(message)
+        basePlateAnchors = anchors
+        publishSnapshot()
     }
 
     private func startObjectTrackingIfPossible() async {
@@ -149,7 +163,8 @@ final class TrackingManager {
                 await self.consumeObjectAnchorUpdates(from: provider)
             }
 
-            snapshot.status = .searching("Object tracking is running. Look directly at the source plate to detect the reference object.")
+            trackingStatus = .searching("Object tracking is running. Look directly at the source plate to detect the reference object.")
+            publishSnapshot()
             try await session.run([provider])
         } catch {
             installPreviewAnchors(message: "Object tracking failed to start (\(error.localizedDescription)). Preview anchors are active.")
@@ -219,7 +234,9 @@ final class TrackingManager {
             case .added, .updated:
                 handleTrackedAnchor(update.anchor, plate: plate)
             case .removed:
-                snapshot.status = .lowConfidence("Lost tracking for the \(plate.title.lowercased()) plate.")
+                trackingStatus = .lowConfidence("Lost tracking for the \(plate.title.lowercased()) plate.")
+                basePlateAnchors.removeValue(forKey: plate)
+                publishSnapshot()
             }
         }
     }
@@ -232,7 +249,7 @@ final class TrackingManager {
         liveTransform.columns.3 = SIMD4<Float>(livePosition.x, livePosition.y, livePosition.z, 1)
         let confidence: Float = anchor.isTracked ? 0.98 : 0.45
 
-        snapshot.plateAnchors[plate] = PlateAnchorState(
+        basePlateAnchors[plate] = PlateAnchorState(
             plate: plate,
             transform: liveTransform,
             position: livePosition,
@@ -241,9 +258,32 @@ final class TrackingManager {
             confidence: confidence
         )
 
-        snapshot.status = anchor.isTracked
+        trackingStatus = anchor.isTracked
             ? .tracking
             : .lowConfidence("Tracking confidence dropped for the \(plate.title.lowercased()) plate.")
+        publishSnapshot()
+    }
+
+    private func publishSnapshot() {
+        var mergedAnchors = basePlateAnchors
+
+        if isTestPlateSimulationEnabled {
+            mergedAnchors[.source] = PlateAnchorState(
+                plate: .source,
+                transform: coordinateMapper.plateWorldTransform(for: .source),
+                position: coordinateMapper.plateWorldPosition(for: .source),
+                localBoundsCenter: coordinateMapper.plateOutlineCenter(for: .source),
+                localBoundsExtent: coordinateMapper.plateOutlineExtent(for: .source),
+                confidence: 0.99,
+                isSimulated: true
+            )
+        }
+
+        snapshot = TrackingSnapshot(
+            status: trackingStatus,
+            plateAnchors: mergedAnchors,
+            detectedToolPose: detectedToolPose
+        )
     }
 }
 

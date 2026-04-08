@@ -253,6 +253,21 @@ struct ContentView: View {
 
             detailItem("Reference Objects", value: appModel.bundledReferenceObjectsLabel)
             detailItem("Tracked Plates", value: appModel.trackedPlatesLabel)
+            detailItem("Test Plate Model", value: appModel.testWellPlateModelName)
+
+            Toggle("Show Test Well Plate Model", isOn: Binding(
+                get: { appModel.isShowingTestWellPlate },
+                set: { appModel.isShowingTestWellPlate = $0 }
+            ))
+            .disabled(!appModel.isTestWellPlateModelAvailable)
+
+            Text(
+                appModel.isTestWellPlateModelAvailable
+                    ? "Displays the bundled USDZ on a simulated source-plate anchor so you can test alignment without depending on live object tracking."
+                    : "Add a well plate `.usdz` file to `ReferenceObjects/` to enable the simulated tracked-plate test toggle."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
 
             if appModel.isPreviewTracking {
                 Text("Preview mode keeps the mixed reality workflow testable until trained reference objects and live pipette tracking are bundled.")

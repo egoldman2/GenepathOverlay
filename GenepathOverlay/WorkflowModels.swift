@@ -155,6 +155,7 @@ struct PlateAnchorState: Sendable {
     var localBoundsCenter: SIMD3<Float>
     var localBoundsExtent: SIMD3<Float>
     var confidence: Float
+    var isSimulated: Bool = false
 }
 
 struct DetectedToolPose: Sendable {

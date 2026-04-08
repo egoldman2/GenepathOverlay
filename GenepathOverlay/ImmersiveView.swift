@@ -24,26 +24,30 @@ struct ImmersiveView: View {
             appModel.overlayRenderer.installIfNeeded(
                 content: &content,
                 mapper: appModel.coordinateMapper,
-                workflowPanel: workflowPanel
+                workflowPanel: workflowPanel,
+                showTestPlateModel: appModel.isShowingTestWellPlate
             )
             appModel.overlayRenderer.update(
                 currentStep: appModel.currentStep,
                 currentPhase: appModel.currentPhase,
                 trackingSnapshot: appModel.trackingSnapshot,
-                mapper: appModel.coordinateMapper
+                mapper: appModel.coordinateMapper,
+                showTestPlateModel: appModel.isShowingTestWellPlate
             )
         } update: { content, attachments in
             let workflowPanel = attachments.entity(for: workflowPanelAttachmentID)
             appModel.overlayRenderer.installIfNeeded(
                 content: &content,
                 mapper: appModel.coordinateMapper,
-                workflowPanel: workflowPanel
+                workflowPanel: workflowPanel,
+                showTestPlateModel: appModel.isShowingTestWellPlate
             )
             appModel.overlayRenderer.update(
                 currentStep: appModel.currentStep,
                 currentPhase: appModel.currentPhase,
                 trackingSnapshot: appModel.trackingSnapshot,
-                mapper: appModel.coordinateMapper
+                mapper: appModel.coordinateMapper,
+                showTestPlateModel: appModel.isShowingTestWellPlate
             )
         } attachments: {
             Attachment(id: workflowPanelAttachmentID) {
