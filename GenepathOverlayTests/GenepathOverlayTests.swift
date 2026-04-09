@@ -40,6 +40,24 @@ struct GenepathOverlayTests {
         #expect(topLeft.normalizedPosition.z < bottomRight.normalizedPosition.z)
     }
 
+    @Test func coordinateMapperBuildsCompleteWellLayout() throws {
+        let mapper = CoordinateMapper()
+
+        let sourceCoordinates = mapper.allCoordinates(for: .source)
+
+        #expect(sourceCoordinates.count == 96)
+        #expect(Set(sourceCoordinates.map(\.well)).count == 96)
+        #expect(sourceCoordinates.first?.well == "A1")
+        #expect(sourceCoordinates.last?.well == "H12")
+
+        let a2 = try mapper.coordinate(for: .source, well: "A2")
+        let b1 = try mapper.coordinate(for: .source, well: "B1")
+        let a1 = try mapper.coordinate(for: .source, well: "A1")
+
+        #expect(abs((a2.normalizedPosition.x - a1.normalizedPosition.x) - mapper.plateLayout.columnSpacing) < 0.0001)
+        #expect(abs((b1.normalizedPosition.z - a1.normalizedPosition.z) - mapper.plateLayout.rowSpacing) < 0.0001)
+    }
+
     @Test func sequenceEngineAdvancesAcrossAspirationAndDispense() throws {
         let mapper = CoordinateMapper()
         let source = try mapper.coordinate(for: .source, well: "A1")

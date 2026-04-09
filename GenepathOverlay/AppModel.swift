@@ -59,6 +59,11 @@ class AppModel {
         sequenceEngine.currentPhase
     }
 
+    var overlayHighlightedCoordinates: [PlateID: Coordinate] {
+        guard let currentStep else { return [:] }
+        return [.source: currentStep.source]
+    }
+
     var progressLabel: String {
         guard let currentStep else {
             return sequenceEngine.totalSteps == 0 ? "No CSV loaded" : "Workflow complete"
