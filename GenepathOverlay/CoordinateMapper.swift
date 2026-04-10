@@ -37,7 +37,7 @@ struct CoordinateMapper: Sendable {
     private let rowLabels = Array("ABCDEFGH")
     private let xSpacing: Float = 0.009
     private let zSpacing: Float = 0.009
-    private let yOffset: Float = 0.0085
+    private let yOffset: Float = 0.0105
     private let plateOutlineExtentValue = SIMD3<Float>(0.128, 0.015, 0.085)
     private let sourcePlatePosition = SIMD3<Float>(-0.24, 1.02, -0.9)
     private let destinationPlatePosition = SIMD3<Float>(0.24, 1.02, -0.9)
@@ -101,9 +101,9 @@ struct CoordinateMapper: Sendable {
     nonisolated func localPosition(for row: Int, column: Int) -> SIMD3<Float> {
         let layout = plateLayout
         return SIMD3<Float>(
-            -(Float(column) * layout.columnSpacing + layout.firstWellOffset.x),
+            Float(column) * layout.columnSpacing + layout.firstWellOffset.x,
             layout.wellYOffset,
-            -(Float(row) * layout.rowSpacing + layout.firstWellOffset.z)
+            Float(row) * layout.rowSpacing + layout.firstWellOffset.z
         )
     }
 
