@@ -28,10 +28,9 @@ struct ImmersiveView: View {
                 showTestPlateModel: appModel.isShowingTestWellPlate
             )
             appModel.overlayRenderer.update(
-                currentStep: appModel.currentStep,
-                currentPhase: appModel.currentPhase,
                 trackingSnapshot: appModel.trackingSnapshot,
                 mapper: appModel.coordinateMapper,
+                highlightedCoordinates: appModel.overlayHighlightedCoordinates,
                 showTestPlateModel: appModel.isShowingTestWellPlate
             )
         } update: { content, attachments in
@@ -43,10 +42,9 @@ struct ImmersiveView: View {
                 showTestPlateModel: appModel.isShowingTestWellPlate
             )
             appModel.overlayRenderer.update(
-                currentStep: appModel.currentStep,
-                currentPhase: appModel.currentPhase,
                 trackingSnapshot: appModel.trackingSnapshot,
                 mapper: appModel.coordinateMapper,
+                highlightedCoordinates: appModel.overlayHighlightedCoordinates,
                 showTestPlateModel: appModel.isShowingTestWellPlate
             )
         } attachments: {
