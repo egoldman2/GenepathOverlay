@@ -55,7 +55,6 @@ struct ErrorMessages: View {
                 //add button integration
             }) {
                 Label("Continue anyway", systemImage: "exclamationmark.triangle")
-                    
                     .padding(.horizontal, 10)
             }
             

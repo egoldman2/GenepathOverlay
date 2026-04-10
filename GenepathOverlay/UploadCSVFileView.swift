@@ -9,7 +9,7 @@ struct UploadCSVFileView: View {
                 .font(.system(size: 48, weight: .regular))
                 .foregroundStyle(.white.opacity(0.9))
                 .padding()
-                .background(.ultraThinMaterial, in: Circle())
+                
 
             // Title
             Text("Upload CSV File")
