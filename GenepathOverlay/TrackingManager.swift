@@ -235,7 +235,6 @@ final class TrackingManager {
                 handleTrackedAnchor(update.anchor, plate: plate)
             case .removed:
                 trackingStatus = .lowConfidence("Lost tracking for the \(plate.title.lowercased()) plate.")
-                basePlateAnchors.removeValue(forKey: plate)
                 publishSnapshot()
             }
         }

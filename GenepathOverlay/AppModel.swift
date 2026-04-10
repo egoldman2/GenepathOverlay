@@ -30,6 +30,7 @@ class AppModel {
     var uiState = UIStateManager()
     var sequenceEngine = SequenceEngine()
     var trackingSnapshot = TrackingSnapshot.idle
+    var isShowingWelcomeScreen = true
     var isShowingTestWellPlate = false {
         didSet {
             trackingManager.setTestPlateSimulationEnabled(isShowingTestWellPlate)
@@ -167,6 +168,10 @@ class AppModel {
 
     func showImporter() {
         uiState.isShowingImporter = true
+    }
+
+    func dismissWelcomeScreen() {
+        isShowingWelcomeScreen = false
     }
 
     func importCSV(from url: URL) async {

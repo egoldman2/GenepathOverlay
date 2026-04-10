@@ -17,31 +17,27 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            LinearGradient(
-                colors: [
-                    Color(red: 0.96, green: 0.98, blue: 1.0),
-                    Color(red: 0.89, green: 0.94, blue: 0.98)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
-            .ignoresSafeArea()
+            backgroundGradient
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    headerCard
-                    workflowCard
-                    trackingCard
+            if appModel.isShowingWelcomeScreen {
+                welcomeScreen
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        headerCard
+                        workflowCard
+                        trackingCard
 
-                    if !appModel.previewSteps.isEmpty {
-                        stepQueueCard
+                        if !appModel.previewSteps.isEmpty {
+                            stepQueueCard
+                        }
+
+                        if let summary = appModel.uiState.summary {
+                            completionCard(summary)
+                        }
                     }
-
-                    if let summary = appModel.uiState.summary {
-                        completionCard(summary)
-                    }
+                    .padding(28)
                 }
-                .padding(28)
             }
         }
         .foregroundStyle(primaryTextColor)
@@ -86,6 +82,63 @@ struct ContentView: View {
                 appModel.uiState.setError(error.localizedDescription)
             }
         }
+    }
+
+    private var backgroundGradient: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.96, green: 0.98, blue: 1.0),
+                Color(red: 0.89, green: 0.94, blue: 0.98)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+        .ignoresSafeArea()
+    }
+
+    private var welcomeScreen: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            VStack(alignment: .leading, spacing: 18) {
+                Text("Welcome to GenepathOverlay")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
+
+                Text("This app guides aspiration and dispense steps on a 96-well plate, with a tracked plate overlay and a fallback model for simulator testing.")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Before you start:")
+                        .font(.headline)
+
+                    Text("Use Import CSV to load a transfer file.")
+                    Text("Open immersive space to view the plate overlay.")
+                    Text("Enable the test plate model when you need the fallback USDZ.")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                HStack(spacing: 12) {
+                    Button("Get Started") {
+                        appModel.dismissWelcomeScreen()
+                    }
+                    .buttonStyle(.borderedProminent)
+
+                    Button("Import CSV") {
+                        appModel.dismissWelcomeScreen()
+                        appModel.showImporter()
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+            .padding(28)
+            .frame(maxWidth: 680, alignment: .leading)
+            .background(cardBackground)
+
+            Spacer()
+        }
+        .padding(28)
     }
 
     private var headerCard: some View {
