@@ -14,6 +14,14 @@ import SwiftUI
 class AppModel {
     let immersiveSpaceID = "ImmersiveSpace"
 
+    enum Screen {
+        case home
+        case loadProtocol
+        case protocolReview
+        case operatorChecklist
+        case workflow
+    }
+
     enum ImmersiveSpaceState {
         case closed
         case inTransition
@@ -30,7 +38,7 @@ class AppModel {
     var uiState = UIStateManager()
     var sequenceEngine = SequenceEngine()
     var trackingSnapshot = TrackingSnapshot.idle
-    var isShowingWelcomeScreen = true
+    var currentScreen: Screen = .home
     var isShowingTestWellPlate = false {
         didSet {
             trackingManager.setTestPlateSimulationEnabled(isShowingTestWellPlate)
@@ -170,8 +178,31 @@ class AppModel {
         uiState.isShowingImporter = true
     }
 
-    func dismissWelcomeScreen() {
-        isShowingWelcomeScreen = false
+    func startSession() {
+        currentScreen = .loadProtocol
+    }
+
+    func goHome() {
+        currentScreen = .home
+    }
+
+    func goToLoadProtocol() {
+        currentScreen = .loadProtocol
+    }
+
+    func goToProtocolReview() {
+        guard sequenceEngine.totalSteps > 0 else { return }
+        currentScreen = .protocolReview
+    }
+
+    func goToOperatorChecklist() {
+        guard sequenceEngine.totalSteps > 0 else { return }
+        currentScreen = .operatorChecklist
+    }
+
+    func beginWorkflow() {
+        guard sequenceEngine.totalSteps > 0 else { return }
+        currentScreen = .workflow
     }
 
     func importCSV(from url: URL) async {
@@ -189,9 +220,11 @@ class AppModel {
             trackingManager.startTracking()
             syncTrackingSnapshot()
             updateWorkflowPresentation()
+            currentScreen = .protocolReview
         } catch {
             sequenceEngine.reset()
             uiState.setError(error.localizedDescription)
+            currentScreen = .loadProtocol
         }
     }
 
