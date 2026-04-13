@@ -59,40 +59,91 @@ struct ImmersiveView: View {
     }
 
     private var banner: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Mixed Reality Workflow Overlay")
-                .font(.headline.weight(.bold))
-
-            Text(appModel.currentInstructionTitle)
-                .font(.subheadline.weight(.semibold))
-
-            Text(appModel.currentInstructionDetail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
+        VStack(alignment: .leading, spacing: 14) {
             if let step = appModel.currentStep {
-                HStack(spacing: 14) {
-                    detailPill("Source \(step.source.well)")
-                    detailPill("Destination \(step.destination.well)")
-                    detailPill(formattedVolume(step.volume))
+                let targetWell = step.coordinate(for: appModel.currentPhase).well
+
+                HStack(alignment: .top, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(appModel.progressLabel.uppercased())
+                            .font(.caption.weight(.bold))
+                            .tracking(1.1)
+                            .foregroundStyle(Color.white.opacity(0.72))
+
+                        Text(targetWell)
+                            .font(.title3.weight(.bold))
+                            .foregroundStyle(.white)
+                    }
+
+                    Spacer(minLength: 0)
+
+                    phaseBadge
+                }
+
+                HStack(spacing: 10) {
+                    metricPill(title: "Target Well", value: targetWell)
+                    metricPill(title: "Volume", value: formattedVolume(step.volume))
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("WORKFLOW")
+                        .font(.caption.weight(.bold))
+                        .tracking(1.1)
+                        .foregroundStyle(Color.white.opacity(0.72))
+
+                    Text("Load a protocol to begin")
+                        .font(.headline.weight(.bold))
+                        .foregroundStyle(.white)
                 }
             }
-
-            Text(appModel.trackingMessage)
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
-        .padding(18)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .padding(.horizontal, 18)
+        .padding(.vertical, 16)
+        .background(stepCardBackground)
+        .overlay(
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         .padding(.horizontal, 20)
     }
 
-    private func detailPill(_ title: String) -> some View {
-        Text(title)
-            .font(.caption.weight(.semibold))
-            .padding(.horizontal, 10)
+    private var phaseBadge: some View {
+        Text(appModel.currentPhase.title)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(Color.white.opacity(0.4), in: Capsule())
+            .background(Color.white.opacity(0.16), in: Capsule())
+    }
+
+    private var stepCardBackground: some View {
+        LinearGradient(
+            colors: [
+                Color(red: 0.09, green: 0.18, blue: 0.31).opacity(0.96),
+                Color(red: 0.10, green: 0.33, blue: 0.58).opacity(0.92),
+                Color(red: 0.13, green: 0.67, blue: 0.70).opacity(0.88)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
+
+    private func metricPill(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(title.uppercased())
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(Color.white.opacity(0.64))
+
+            Text(value)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 
     private func formattedVolume(_ volume: Double) -> String {
