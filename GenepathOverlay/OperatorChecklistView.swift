@@ -9,13 +9,19 @@ import SwiftUI
 
 struct OperatorChecklistView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.openImmersiveSpace) private var openImmersiveSpace
 
     @State private var confirmedPlates = false
     @State private var readyToValidate = false
     @State private var awareOfRecovery = false
+    @State private var mixedRealityReady = false
+
+    private var baseChecklistComplete: Bool {
+        confirmedPlates && readyToValidate && awareOfRecovery
+    }
 
     private var canStartRun: Bool {
-        confirmedPlates && readyToValidate && awareOfRecovery
+        baseChecklistComplete && mixedRealityReady
     }
 
     var body: some View {
@@ -52,18 +58,48 @@ struct OperatorChecklistView: View {
                             title: "If a mismatch appears, I will retry before proceeding",
                             isOn: $awareOfRecovery
                         )
+                        OperatorChecklistToggleRow(
+                            title: "Show Mixed Reality View",
+                            isOn: $mixedRealityReady
+                        )
                     }
 
-                    Button("Start Guided Run") {
-                        appModel.beginWorkflow()
+                    Button("Enter Guided Run") {
+                        Task { @MainActor in
+                            if appModel.immersiveSpaceState == .open {
+                                mixedRealityReady = true
+                                appModel.beginWorkflow()
+                                return
+                            }
+
+                            appModel.immersiveSpaceState = .inTransition
+                            let result = await openImmersiveSpace(id: appModel.immersiveSpaceID)
+                            if case .opened = result {
+                                appModel.immersiveSpaceState = .open
+                                mixedRealityReady = true
+                                appModel.beginWorkflow()
+                            } else {
+                                appModel.immersiveSpaceState = .closed
+                                mixedRealityReady = false
+                            }
+                        }
                     }
-                    .buttonStyle(.borderedProminent)
-                    .tint(AppUIStyle.accentColor)
+                    .buttonStyle(PrimaryActionButton())
                     .disabled(!canStartRun)
                     .opacity(canStartRun ? 1.0 : 0.45)
                 }
             }
         }
+        .onAppear {
+            syncMixedRealityChecklistState()
+        }
+        .onChange(of: appModel.immersiveSpaceState) { _, _ in
+            syncMixedRealityChecklistState()
+        }
+    }
+
+    private func syncMixedRealityChecklistState() {
+        mixedRealityReady = appModel.immersiveSpaceState == .open
     }
 }
 

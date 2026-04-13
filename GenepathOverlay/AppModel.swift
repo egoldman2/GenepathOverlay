@@ -19,6 +19,7 @@ class AppModel {
         case loadProtocol
         case protocolReview
         case operatorChecklist
+        case workflowSettings
         case workflow
     }
 
@@ -198,6 +199,10 @@ class AppModel {
     func goToOperatorChecklist() {
         guard sequenceEngine.totalSteps > 0 else { return }
         currentScreen = .operatorChecklist
+    }
+
+    func goToWorkflowSettings() {
+        currentScreen = .workflowSettings
     }
 
     func beginWorkflow() {

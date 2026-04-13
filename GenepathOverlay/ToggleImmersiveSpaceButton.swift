@@ -50,6 +50,9 @@ struct ToggleImmersiveSpaceButton: View {
             }
         } label: {
             Text(appModel.immersiveSpaceState == .open ? "Hide Mixed Reality View" : "Show Mixed Reality View")
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+                .fixedSize(horizontal: true, vertical: false)
         }
         .disabled(appModel.immersiveSpaceState == .inTransition)
         .animation(.none, value: 0)

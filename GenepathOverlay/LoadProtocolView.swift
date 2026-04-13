@@ -38,8 +38,7 @@ struct LoadProtocolView: View {
                         Button("Import CSV") {
                             appModel.showImporter()
                         }
-                        .buttonStyle(.borderedProminent)
-                        .tint(AppUIStyle.accentColor)
+                        .buttonStyle(PrimaryActionButton())
 
                         Text("You will review the full list of steps before the guided run begins.")
                             .font(.subheadline)

@@ -12,28 +12,25 @@ struct ContentView: View {
     @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        ZStack {
-            AppUIStyle.backgroundGradient
-            AppUIBackgroundShapes()
-
-            Group {
-                switch appModel.currentScreen {
-                case .home:
-                    HomeScreenView()
-                case .loadProtocol:
-                    LoadProtocolView()
-                case .protocolReview:
-                    ProtocolReviewView()
-                case .operatorChecklist:
-                    OperatorChecklistView()
-                case .workflow:
-                    ActiveWorkflowView()
-                }
+        Group {
+            switch appModel.currentScreen {
+            case .home:
+                HomeScreenView()
+            case .loadProtocol:
+                LoadProtocolView()
+            case .protocolReview:
+                ProtocolReviewView()
+            case .operatorChecklist:
+                OperatorChecklistView()
+            case .workflowSettings:
+                WorkflowSettingsView()
+            case .workflow:
+                ActiveWorkflowView()
             }
-            .padding(28)
         }
+        .padding(28)
         .foregroundStyle(AppUIStyle.primaryTextColor)
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
         .task {
             appModel.prepareForLaunch()
         }

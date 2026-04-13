@@ -9,6 +9,7 @@ import SwiftUI
 
 struct ActiveWorkflowView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.openWindow) private var openWindow
 
     private var isLoadingState: Bool {
         switch appModel.uiState.appState {
@@ -30,26 +31,8 @@ struct ActiveWorkflowView: View {
                     GuidedTransferHeroView(isLoadingState: isLoadingState)
                 }
 
-                HStack(alignment: .top, spacing: 20) {
-                    VStack(alignment: .leading, spacing: 20) {
-                        WorkflowCardView()
-
-                        if !appModel.previewSteps.isEmpty {
-                            StepQueueCardView()
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    VStack(alignment: .leading, spacing: 20) {
-                        TrackingCardView()
-
-                        if let summary = appModel.uiState.summary {
-                            SessionSummaryCardView(summary: summary)
-                        } else {
-                            OperatorFocusCardView()
-                        }
-                    }
-                    .frame(width: 320, alignment: .leading)
+                if let summary = appModel.uiState.summary {
+                    SessionSummaryCardView(summary: summary)
                 }
             }
             .padding(.bottom, 24)
@@ -59,33 +42,51 @@ struct ActiveWorkflowView: View {
 
     private var topBar: some View {
         HStack(alignment: .center, spacing: 16) {
-            VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    appModel.goToProtocolReview()
-                } label: {
-                    Label("Back", systemImage: "chevron.left")
-                }
-                .buttonStyle(.bordered)
+            Button {
+                appModel.goToProtocolReview()
+            } label: {
+                Label("Back", systemImage: "chevron.left")
+            }
+            .buttonStyle(.bordered)
 
-                PageEyebrow(title: "Current session")
-
+            VStack(alignment: .leading, spacing: 6) {
                 Text("Guided Transfer Workflow")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
 
                 if let fileName = appModel.uiState.importedFileName {
                     Text(fileName)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                 }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 0)
+            HStack(spacing: 10) {
+                Button {
+                    appModel.goToWorkflowSettings()
+                } label: {
+                    Image(systemName: "gearshape")
+                        .font(.headline.weight(.semibold))
+                        .frame(width: 18, height: 18)
+                }
+                .buttonStyle(.bordered)
 
-            ToggleImmersiveSpaceButton()
-                .buttonStyle(.borderedProminent)
-                .tint(AppUIStyle.accentColor)
+                Button("Open Steps") {
+                    openWindow(id: "step-queue-window")
+                }
+                .buttonStyle(.bordered)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+
+                ToggleImmersiveSpaceButton()
+                    .buttonStyle(PrimaryActionButton())
+            }
+            .fixedSize(horizontal: true, vertical: false)
         }
-        .padding(24)
+        .padding(20)
         .background(AppCardBackground())
     }
 }

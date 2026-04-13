@@ -48,8 +48,7 @@ struct HomeScreenView: View {
                 Button("Start Session") {
                     appModel.startSession()
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(AppUIStyle.accentColor)
+                .buttonStyle(PrimaryActionButton())
             }
 
             Spacer(minLength: 0)
