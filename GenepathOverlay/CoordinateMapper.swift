@@ -125,10 +125,28 @@ struct CoordinateMapper: Sendable {
 
     nonisolated func alternateCoordinate(for coordinate: Coordinate) -> Coordinate {
         let layout = plateLayout
-        let nextColumn = min(coordinate.column + 1, layout.columns - 1)
-        let nextRow = nextColumn == coordinate.column ? min(coordinate.row + 1, layout.rows - 1) : coordinate.row
-        let rowLabel = rowLabels[nextRow]
-        let alternateWell = "\(rowLabel)\(nextColumn + 1)"
+        let alternateColumn: Int
+        if coordinate.column <= layout.columns - 3 {
+            alternateColumn = coordinate.column + 2
+        } else if coordinate.column >= 2 {
+            alternateColumn = coordinate.column - 2
+        } else {
+            alternateColumn = coordinate.column == 0 ? 1 : 0
+        }
+
+        let alternateRow: Int
+        if alternateColumn == coordinate.column {
+            if coordinate.row <= layout.rows - 2 {
+                alternateRow = coordinate.row + 1
+            } else {
+                alternateRow = max(coordinate.row - 1, 0)
+            }
+        } else {
+            alternateRow = coordinate.row
+        }
+
+        let rowLabel = rowLabels[alternateRow]
+        let alternateWell = "\(rowLabel)\(alternateColumn + 1)"
 
         return (try? self.coordinate(for: coordinate.plate, well: alternateWell)) ?? coordinate
     }

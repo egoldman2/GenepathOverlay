@@ -90,11 +90,10 @@ final class TrackingManager {
 
     func simulateDetection(for coordinate: Coordinate, mismatch: Bool = false) {
         let target = mismatch ? coordinateMapper.alternateCoordinate(for: coordinate) : coordinate
-        let smoothedPosition = filters[target.plate]?.add(target.normalizedPosition) ?? target.normalizedPosition
 
         detectedToolPose = DetectedToolPose(
             plate: target.plate,
-            position: smoothedPosition,
+            position: target.normalizedPosition,
             confidence: 0.92
         )
         publishSnapshot()

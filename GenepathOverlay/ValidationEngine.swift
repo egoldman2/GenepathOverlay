@@ -5,7 +5,7 @@ struct ValidationEngine {
     let wellTolerance: Float
     let minimumConfidence: Float
 
-    init(wellTolerance: Float = 0.009, minimumConfidence: Float = 0.55) {
+    init(wellTolerance: Float = 0.004, minimumConfidence: Float = 0.55) {
         self.wellTolerance = wellTolerance
         self.minimumConfidence = minimumConfidence
     }
