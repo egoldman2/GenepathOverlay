@@ -84,6 +84,15 @@ struct ImmersiveView: View {
                     metricPill(title: "Target Well", value: targetWell)
                     metricPill(title: "Volume", value: formattedVolume(step.volume))
                 }
+
+                if appModel.isPipettePressed {
+                    Text("Pipette Button Pressed")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(Color.green.opacity(0.88), in: Capsule())
+                }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("WORKFLOW")

@@ -29,10 +29,10 @@ struct GenepathOverlayApp: App {
             ImmersiveView()
                 .environment(appModel)
                 .onAppear {
-                    appModel.immersiveSpaceState = .open
+                    appModel.setImmersiveSpaceState(.open)
                 }
                 .onDisappear {
-                    appModel.immersiveSpaceState = .closed
+                    appModel.setImmersiveSpaceState(.closed)
                 }
         }
         .immersionStyle(selection: .constant(.mixed), in: .mixed)

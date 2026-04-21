@@ -7,6 +7,8 @@
 
 import Testing
 @testable import GenepathOverlay
+import Foundation
+import simd
 
 struct GenepathOverlayTests {
     @Test func csvParserBuildsStructuredSteps() throws {
@@ -72,5 +74,72 @@ struct GenepathOverlayTests {
         #expect(engine.currentPhase == .dispense)
         let nextStep = engine.advance()
         #expect(nextStep == nil)
+    }
+
+    @Test func pipetteCalibrationBuildsThresholdsFromRestAndPressSamples() {
+        let restSamples = Array(repeating: SIMD3<Float>(0, 0, 0), count: 12)
+        let pressedSamples = Array(repeating: SIMD3<Float>(0, 0, 0.01), count: 12)
+
+        let profile = PipetteCalibrationProfile.build(restSamples: restSamples, pressedSamples: pressedSamples)
+
+        #expect(profile != nil)
+        #expect(profile?.pressThreshold ?? 0 > profile?.releaseThreshold ?? 0)
+        #expect(abs((profile?.travel(for: SIMD3<Float>(0, 0, 0.01)) ?? 0) - 0.01) < 0.0001)
+    }
+
+    @Test func pipettePressClassifierCountsOnlyRisingEdges() {
+        var classifier = PipettePressClassifier(smoothingSampleCount: 1, consecutiveSamplesRequired: 2, minimumGripConfidence: 0.55)
+        let profile = PipetteCalibrationProfile(
+            restThumbPosition: .zero,
+            pressedThumbPosition: SIMD3<Float>(0, 0, 0.01),
+            pressDirection: SIMD3<Float>(0, 0, 1),
+            pressThreshold: 0.0065,
+            releaseThreshold: 0.0035
+        )
+        classifier.setCalibration(profile)
+
+        let start = Date()
+        _ = classifier.update(travel: 0.0, gripConfidence: 0.9, timestamp: start)
+        _ = classifier.update(travel: 0.008, gripConfidence: 0.9, timestamp: start.addingTimeInterval(0.1))
+        let pressed = classifier.update(travel: 0.009, gripConfidence: 0.9, timestamp: start.addingTimeInterval(0.2))
+        let held = classifier.update(travel: 0.01, gripConfidence: 0.9, timestamp: start.addingTimeInterval(0.3))
+        _ = classifier.update(travel: 0.002, gripConfidence: 0.9, timestamp: start.addingTimeInterval(0.4))
+        let released = classifier.update(travel: 0.001, gripConfidence: 0.9, timestamp: start.addingTimeInterval(0.5))
+
+        #expect(pressed.isPressed)
+        #expect(pressed.pressCount == 1)
+        #expect(held.pressCount == 1)
+        #expect(released.isPressed == false)
+        #expect(released.pressCount == 1)
+        #expect(released.pressEndedAt != nil)
+    }
+
+    @Test func pipettePressClassifierIgnoresInputWithoutCalibration() {
+        var classifier = PipettePressClassifier(smoothingSampleCount: 1, consecutiveSamplesRequired: 1, minimumGripConfidence: 0.55)
+        let output = classifier.update(travel: 0.02, gripConfidence: 0.95, timestamp: Date())
+
+        #expect(output.isPressed == false)
+        #expect(output.pressCount == 0)
+        #expect(output.smoothedTravel == nil)
+    }
+
+    @Test func pipettePressClassifierReleasesWhenGripIsLost() {
+        var classifier = PipettePressClassifier(smoothingSampleCount: 1, consecutiveSamplesRequired: 1, minimumGripConfidence: 0.55)
+        let profile = PipetteCalibrationProfile(
+            restThumbPosition: .zero,
+            pressedThumbPosition: SIMD3<Float>(0, 0, 0.01),
+            pressDirection: SIMD3<Float>(0, 0, 1),
+            pressThreshold: 0.0065,
+            releaseThreshold: 0.0035
+        )
+        classifier.setCalibration(profile)
+
+        let start = Date()
+        _ = classifier.update(travel: 0.008, gripConfidence: 0.9, timestamp: start)
+        let output = classifier.update(travel: 0.008, gripConfidence: 0.1, timestamp: start.addingTimeInterval(0.1))
+
+        #expect(output.isPressed == false)
+        #expect(output.pressCount == 1)
+        #expect(output.pressEndedAt != nil)
     }
 }

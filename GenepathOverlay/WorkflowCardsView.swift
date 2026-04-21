@@ -43,6 +43,7 @@ struct GuidedTransferHeroView: View {
             }
 
             ValidationStatusView()
+            PipetteInputStatusCard(compact: true)
 
             WorkflowActionRow()
         }
@@ -258,6 +259,7 @@ struct TrackingCardView: View {
             DetailItemView(title: "Reference Objects", value: appModel.bundledReferenceObjectsLabel)
             DetailItemView(title: "Tracked Plates", value: appModel.trackedPlatesLabel)
             DetailItemView(title: "Test Plate Model", value: appModel.testWellPlateModelName)
+            PipetteInputStatusCard(compact: false)
 
             Toggle("Show Test Well Plate Model", isOn: Binding(
                 get: { appModel.isShowingTestWellPlate },
@@ -281,6 +283,60 @@ struct TrackingCardView: View {
         }
         .padding(22)
         .background(AppCardBackground())
+    }
+}
+
+private struct PipetteInputStatusCard: View {
+    @Environment(AppModel.self) private var appModel
+
+    let compact: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 10) {
+                Label("Pipette button", systemImage: appModel.isPipettePressed ? "hand.thumbsup.fill" : "hand.thumbsup")
+                    .font(.headline)
+
+                Spacer(minLength: 0)
+
+                Text(appModel.pipettePressLabel)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(appModel.isPipettePressed ? .white : .secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(
+                        Capsule()
+                            .fill(appModel.isPipettePressed ? AppUIStyle.accentColor.opacity(0.9) : Color.white.opacity(0.08))
+                    )
+            }
+
+            Text(appModel.pipetteTrackingMessage)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            if compact == false {
+                DetailItemView(title: "Selected Hand", value: appModel.selectedPipetteHandLabel)
+                DetailItemView(title: "Calibration", value: appModel.pipetteCalibrationMessage)
+                DetailItemView(title: "Grip Confidence", value: appModel.pipetteGripConfidenceLabel)
+                DetailItemView(title: "Press Count", value: "\(appModel.pipetteInputState.pressCount)")
+                DetailItemView(title: "Last Event", value: appModel.lastPipetteEventLabel)
+                Text(appModel.pipetteCalibrationProgressLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("Hand: \(appModel.selectedPipetteHandLabel) • Grip: \(appModel.pipetteGripConfidenceLabel) • Presses: \(appModel.pipetteInputState.pressCount)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(appModel.lastPipetteEventLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(AppTintedPanel(opacity: compact ? 0.7 : 0.86))
     }
 }
 

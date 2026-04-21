@@ -21,7 +21,7 @@ struct OperatorChecklistView: View {
     }
 
     private var canStartRun: Bool {
-        baseChecklistComplete && mixedRealityReady
+        baseChecklistComplete
     }
 
     var body: some View {
@@ -66,22 +66,9 @@ struct OperatorChecklistView: View {
 
                     Button("Enter Guided Run") {
                         Task { @MainActor in
-                            if appModel.immersiveSpaceState == .open {
-                                mixedRealityReady = true
-                                appModel.beginWorkflow()
-                                return
-                            }
-
-                            appModel.immersiveSpaceState = .inTransition
-                            let result = await openImmersiveSpace(id: appModel.immersiveSpaceID)
-                            if case .opened = result {
-                                appModel.immersiveSpaceState = .open
-                                mixedRealityReady = true
-                                appModel.beginWorkflow()
-                            } else {
-                                appModel.immersiveSpaceState = .closed
-                                mixedRealityReady = false
-                            }
+                            await openMixedRealityIfNeeded()
+                            guard mixedRealityReady else { return }
+                            appModel.goToPipetteCalibration()
                         }
                     }
                     .buttonStyle(PrimaryActionButton())
@@ -100,6 +87,24 @@ struct OperatorChecklistView: View {
 
     private func syncMixedRealityChecklistState() {
         mixedRealityReady = appModel.immersiveSpaceState == .open
+    }
+
+    @MainActor
+    private func openMixedRealityIfNeeded() async {
+        if appModel.immersiveSpaceState == .open {
+            mixedRealityReady = true
+            return
+        }
+
+        appModel.setImmersiveSpaceState(.inTransition)
+        let result = await openImmersiveSpace(id: appModel.immersiveSpaceID)
+        if case .opened = result {
+            appModel.setImmersiveSpaceState(.open)
+            mixedRealityReady = true
+        } else {
+            appModel.setImmersiveSpaceState(.closed)
+            mixedRealityReady = false
+        }
     }
 }
 

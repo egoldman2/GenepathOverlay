@@ -148,6 +148,100 @@ enum TrackingStatus: Sendable {
     }
 }
 
+enum PipetteHandedness: String, CaseIterable, Identifiable, Sendable, Equatable {
+    case left
+    case right
+
+    var id: String { rawValue }
+
+    var title: String {
+        rawValue.capitalized
+    }
+}
+
+enum PipetteCalibrationStep: Sendable, Equatable {
+    case handNotSelected
+    case waitingForHand
+    case readyForRest
+    case collectingRest
+    case readyForPress
+    case collectingPress
+    case complete
+    case failed
+}
+
+struct PipetteCalibrationState: Sendable, Equatable {
+    var selectedHand: PipetteHandedness?
+    var step: PipetteCalibrationStep
+    var restSampleCount: Int
+    var pressedSampleCount: Int
+    var requiredSampleCount: Int
+    var errorMessage: String?
+
+    var isComplete: Bool {
+        step == .complete
+    }
+
+    var summary: String {
+        switch step {
+        case .handNotSelected:
+            return "Select the hand holding the pipette to begin calibration."
+        case .waitingForHand:
+            return "Show the selected hand in the mixed reality view to start calibration."
+        case .readyForRest:
+            return "Hold the pipette at rest, then capture the resting thumb pose."
+        case .collectingRest:
+            return "Capturing resting thumb pose (\(restSampleCount)/\(requiredSampleCount))."
+        case .readyForPress:
+            return "Press and hold the pipette button, then capture the pressed thumb pose."
+        case .collectingPress:
+            return "Capturing pressed thumb pose (\(pressedSampleCount)/\(requiredSampleCount))."
+        case .complete:
+            return "Calibration complete. Live thumb-press detection is active."
+        case .failed:
+            return errorMessage ?? "Calibration failed. Reset and try again."
+        }
+    }
+
+    static let idle = PipetteCalibrationState(
+        selectedHand: nil,
+        step: .handNotSelected,
+        restSampleCount: 0,
+        pressedSampleCount: 0,
+        requiredSampleCount: 24,
+        errorMessage: nil
+    )
+}
+
+enum PipetteInputTrackingStatus: Sendable, Equatable {
+    case idle
+    case waitingForImmersiveSpace
+    case requestingAuthorization
+    case waitingForHand
+    case calibrating
+    case ready
+    case unavailable(String)
+
+    var message: String {
+        switch self {
+        case .idle:
+            return "Pipette input is idle."
+        case .waitingForImmersiveSpace:
+            return "Open the mixed reality view to start pipette input tracking."
+        case .requestingAuthorization:
+            return "Requesting hand-tracking access."
+        case .waitingForHand:
+            return "Waiting for the selected pipette hand."
+        case .calibrating:
+            return "Collecting thumb calibration samples."
+        case .ready:
+            return "Thumb-press detection is active."
+        case .unavailable(let message):
+            return message
+        }
+    }
+}
+
 struct PlateAnchorState: Sendable {
     let plate: PlateID
     var transform: simd_float4x4
@@ -164,15 +258,41 @@ struct DetectedToolPose: Sendable {
     let confidence: Float
 }
 
+struct PipettePressState: Sendable, Equatable {
+    var selectedHand: PipetteHandedness?
+    var calibration: PipetteCalibrationState
+    var trackingStatus: PipetteInputTrackingStatus
+    var gripConfidence: Float
+    var isPressed: Bool
+    var pressBeganAt: Date?
+    var pressEndedAt: Date?
+    var pressCount: Int
+    var currentTravel: Float?
+
+    static let idle = PipettePressState(
+        selectedHand: nil,
+        calibration: .idle,
+        trackingStatus: .waitingForImmersiveSpace,
+        gripConfidence: 0,
+        isPressed: false,
+        pressBeganAt: nil,
+        pressEndedAt: nil,
+        pressCount: 0,
+        currentTravel: nil
+    )
+}
+
 struct TrackingSnapshot: Sendable {
     var status: TrackingStatus
     var plateAnchors: [PlateID: PlateAnchorState]
     var detectedToolPose: DetectedToolPose?
+    var pipetteInput: PipettePressState
 
     static let idle = TrackingSnapshot(
         status: .idle,
         plateAnchors: [:],
-        detectedToolPose: nil
+        detectedToolPose: nil,
+        pipetteInput: .idle
     )
 }
 

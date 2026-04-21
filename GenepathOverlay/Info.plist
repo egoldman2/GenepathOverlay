@@ -20,6 +20,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>NSWorldSensingUsageDescription</key>
 	<string>GenepathOverlay uses world sensing to track the plate and anchor pipetting guidance in mixed reality.</string>
+	<key>NSHandsTrackingUsageDescription</key>
+	<string>GenepathOverlay uses hand tracking to calibrate the pipette grip and detect when the operator presses the pipette button.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationPreferredDefaultSceneSessionRole</key>

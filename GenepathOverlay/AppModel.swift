@@ -13,12 +13,14 @@ import SwiftUI
 @Observable
 class AppModel {
     let immersiveSpaceID = "ImmersiveSpace"
+    private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 
     enum Screen {
         case home
         case loadProtocol
         case protocolReview
         case operatorChecklist
+        case pipetteCalibration
         case workflowSettings
         case workflow
     }
@@ -57,7 +59,9 @@ class AppModel {
             self?.syncTrackingSnapshot()
         }
         uiState.prepareForLaunch()
-        trackingManager.startTracking()
+        if isRunningTests == false {
+            trackingManager.startTracking()
+        }
         trackingSnapshot = trackingManager.snapshot
     }
 
@@ -106,6 +110,59 @@ class AppModel {
 
     var trackingMessage: String {
         trackingSnapshot.status.message
+    }
+
+    var pipetteInputState: PipettePressState {
+        trackingSnapshot.pipetteInput
+    }
+
+    var pipetteTrackingMessage: String {
+        pipetteInputState.trackingStatus.message
+    }
+
+    var pipetteCalibrationMessage: String {
+        pipetteInputState.calibration.summary
+    }
+
+    var selectedPipetteHand: PipetteHandedness? {
+        pipetteInputState.selectedHand
+    }
+
+    var selectedPipetteHandLabel: String {
+        selectedPipetteHand?.title ?? "Not selected"
+    }
+
+    var isPipetteCalibrationComplete: Bool {
+        pipetteInputState.calibration.isComplete
+    }
+
+    var isPipettePressed: Bool {
+        pipetteInputState.isPressed
+    }
+
+    var pipettePressLabel: String {
+        pipetteInputState.isPressed ? "Pressed" : "Idle"
+    }
+
+    var pipetteGripConfidenceLabel: String {
+        "\(Int((pipetteInputState.gripConfidence * 100).rounded()))%"
+    }
+
+    var pipetteCalibrationProgressLabel: String {
+        let calibration = pipetteInputState.calibration
+        return "\(calibration.restSampleCount)/\(calibration.requiredSampleCount) rest, \(calibration.pressedSampleCount)/\(calibration.requiredSampleCount) pressed"
+    }
+
+    var lastPipetteEventLabel: String {
+        if let ended = pipetteInputState.pressEndedAt {
+            return "Released \(ended.formatted(date: .omitted, time: .standard))"
+        }
+
+        if let began = pipetteInputState.pressBeganAt {
+            return "Pressed \(began.formatted(date: .omitted, time: .standard))"
+        }
+
+        return "No thumb presses recorded yet"
     }
 
     var bundledReferenceObjectsLabel: String {
@@ -170,6 +227,7 @@ class AppModel {
         }
 
         if trackingSnapshot.plateAnchors.isEmpty {
+            guard isRunningTests == false else { return }
             trackingManager.startTracking()
             syncTrackingSnapshot()
         }
@@ -180,6 +238,8 @@ class AppModel {
     }
 
     func startSession() {
+        trackingManager.resetPipetteCalibration(keepSelectedHand: false)
+        syncTrackingSnapshot()
         currentScreen = .loadProtocol
     }
 
@@ -199,6 +259,11 @@ class AppModel {
     func goToOperatorChecklist() {
         guard sequenceEngine.totalSteps > 0 else { return }
         currentScreen = .operatorChecklist
+    }
+
+    func goToPipetteCalibration() {
+        guard sequenceEngine.totalSteps > 0 else { return }
+        currentScreen = .pipetteCalibration
     }
 
     func goToWorkflowSettings() {
@@ -291,6 +356,32 @@ class AppModel {
         uiState.isShowingExporter = true
     }
 
+    func setImmersiveSpaceState(_ state: ImmersiveSpaceState) {
+        immersiveSpaceState = state
+        trackingManager.setImmersiveSpaceActive(state == .open)
+        syncTrackingSnapshot()
+    }
+
+    func setPipetteHandedness(_ handedness: PipetteHandedness?) {
+        trackingManager.setPipetteHandedness(handedness)
+        syncTrackingSnapshot()
+    }
+
+    func startRestCalibrationCapture() {
+        trackingManager.startRestCalibrationCapture()
+        syncTrackingSnapshot()
+    }
+
+    func startPressedCalibrationCapture() {
+        trackingManager.startPressedCalibrationCapture()
+        syncTrackingSnapshot()
+    }
+
+    func resetPipetteCalibration() {
+        trackingManager.resetPipetteCalibration()
+        syncTrackingSnapshot()
+    }
+
     private func updateWorkflowPresentation() {
         if let currentStep {
             uiState.setRunning(step: currentStep, phase: currentPhase)
@@ -317,6 +408,9 @@ class AppModel {
             "Total steps: \(summary.totalSteps)",
             "Aspiration warnings: \(summary.aspirationWarnings)",
             "Dispense warnings: \(summary.dispenseWarnings)",
+            "Pipette hand: \(selectedPipetteHandLabel)",
+            "Pipette calibration: \(pipetteInputState.calibration.isComplete ? "Complete" : "Incomplete")",
+            "Pipette press count: \(pipetteInputState.pressCount)",
             ""
         ]
 

@@ -22,6 +22,8 @@ struct ContentView: View {
                 ProtocolReviewView()
             case .operatorChecklist:
                 OperatorChecklistView()
+            case .pipetteCalibration:
+                PipetteCalibrationSetupView()
             case .workflowSettings:
                 WorkflowSettingsView()
             case .workflow:
