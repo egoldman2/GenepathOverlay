@@ -5,6 +5,9 @@ import UIKit
 @MainActor
 final class OverlayRenderer {
     private let plateVisualCorrection = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
+    private let thumbGuideLength: Float = 0.25
+    private let thumbGuideThickness: Float = 0.004
+    private let thumbGuideStartInset: Float = 0.02
     private var rootEntity: Entity?
     private var plateEntities: [PlateID: Entity] = [:]
     private var plateVisualEntities: [PlateID: Entity] = [:]
@@ -15,6 +18,7 @@ final class OverlayRenderer {
     private weak var workflowPanelEntity: Entity?
     private var testPlateContainerEntity: Entity?
     private var testPlateModelEntity: Entity?
+    private var thumbGuideEntity: ModelEntity?
     private var testPlateLoadTask: Task<Void, Never>?
     private var loadedTestPlateURL: URL?
 
@@ -28,6 +32,7 @@ final class OverlayRenderer {
             if rootEntity.scene == nil {
                 content.add(rootEntity)
             }
+            installThumbGuideIfNeeded(on: rootEntity)
             if let workflowPanel {
                 attachWorkflowPanelIfNeeded(workflowPanel)
             }
@@ -45,6 +50,7 @@ final class OverlayRenderer {
         }
 
         rootEntity = root
+        installThumbGuideIfNeeded(on: root)
         content.add(root)
 
         if let workflowPanel {
@@ -100,6 +106,7 @@ final class OverlayRenderer {
         }
 
         updateTestPlateVisibility(isVisible: showTestPlateModel)
+        updateThumbGuide(using: trackingSnapshot)
     }
 
     private func attachWorkflowPanelIfNeeded(_ workflowPanel: Entity) {
@@ -124,6 +131,43 @@ final class OverlayRenderer {
         container.isEnabled = false
         sourcePlate.addChild(container)
         testPlateContainerEntity = container
+    }
+
+    private func installThumbGuideIfNeeded(on root: Entity) {
+        guard thumbGuideEntity == nil else { return }
+
+        let material = SimpleMaterial(
+            color: UIColor(red: 0.12, green: 0.92, blue: 0.35, alpha: 0.95),
+            roughness: 0.05,
+            isMetallic: false
+        )
+        let guide = ModelEntity(
+            mesh: .generateCylinder(height: 1, radius: thumbGuideThickness),
+            materials: [material]
+        )
+        guide.name = "thumb-guide-line"
+        guide.isEnabled = false
+        root.addChild(guide)
+        thumbGuideEntity = guide
+    }
+
+    private func updateThumbGuide(using trackingSnapshot: TrackingSnapshot) {
+        guard let thumbGuideEntity else { return }
+        guard
+            let start = trackingSnapshot.pipetteInput.thumbWorldPosition,
+            let direction = trackingSnapshot.pipetteInput.thumbWorldDirection
+        else {
+            thumbGuideEntity.isEnabled = false
+            return
+        }
+
+        let normalizedDirection = simd_normalize(direction)
+        let insetStart = start + normalizedDirection * thumbGuideStartInset
+        let end = insetStart + normalizedDirection * thumbGuideLength
+        thumbGuideEntity.isEnabled = true
+        thumbGuideEntity.position = (insetStart + end) * 0.5
+        thumbGuideEntity.scale = SIMD3<Float>(1, thumbGuideLength, 1)
+        thumbGuideEntity.orientation = simd_quatf(from: SIMD3<Float>(0, 1, 0), to: normalizedDirection)
     }
 
     private func updateTestPlateVisibility(isVisible: Bool) {

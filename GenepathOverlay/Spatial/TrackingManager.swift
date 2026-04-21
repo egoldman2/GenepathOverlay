@@ -23,24 +23,10 @@ final class TrackingManager {
         }
     }
 
-    private struct HandFrame {
-        let origin: SIMD3<Float>
-        let xAxis: SIMD3<Float>
-        let yAxis: SIMD3<Float>
-        let zAxis: SIMD3<Float>
-
-        func localCoordinates(of worldPoint: SIMD3<Float>) -> SIMD3<Float> {
-            let delta = worldPoint - origin
-            return SIMD3<Float>(
-                simd_dot(delta, xAxis),
-                simd_dot(delta, yAxis),
-                simd_dot(delta, zAxis)
-            )
-        }
-    }
-
     private struct PipetteHandObservation {
         let thumbLocalPosition: SIMD3<Float>
+        let thumbWorldPosition: SIMD3<Float>
+        let thumbWorldDirection: SIMD3<Float>?
         let gripConfidence: Float
     }
 
@@ -68,6 +54,8 @@ final class TrackingManager {
     private var handTrackingSupported = false
     private var requestedHandAuthorization = false
     private var handAuthorizationGranted = false
+    private let selectedHandLossGraceInterval: TimeInterval = 0.5
+    private var lastSelectedHandObservationAt: Date?
 
     private var pipetteHandedness: PipetteHandedness?
     private var pipetteCalibrationState = PipetteCalibrationState.idle
@@ -76,6 +64,8 @@ final class TrackingManager {
     private var restCalibrationSamples: [SIMD3<Float>] = []
     private var pressedCalibrationSamples: [SIMD3<Float>] = []
     private var latestPipetteOutput = PipettePressClassifier.Output()
+    private var latestThumbWorldPosition: SIMD3<Float>?
+    private var latestThumbWorldDirection: SIMD3<Float>?
 
     private(set) var bundledReferenceObjectNames: [String] = [] {
         didSet { onStateChange?() }
@@ -128,6 +118,9 @@ final class TrackingManager {
         handTrackingSupported = false
         requestedHandAuthorization = false
         handAuthorizationGranted = false
+        lastSelectedHandObservationAt = nil
+        latestThumbWorldPosition = nil
+        latestThumbWorldDirection = nil
         latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
         updatePipetteTrackingStatus()
         publishSnapshot()
@@ -168,6 +161,9 @@ final class TrackingManager {
         } else {
             handFeasibilityTask?.cancel()
             selectedHandSeenRecently = false
+            lastSelectedHandObservationAt = nil
+            latestThumbWorldPosition = nil
+            latestThumbWorldDirection = nil
             latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
         }
 
@@ -239,6 +235,9 @@ final class TrackingManager {
         pressedCalibrationSamples.removeAll()
         pipettePressClassifier.reset()
         latestPipetteOutput = PipettePressClassifier.Output()
+        lastSelectedHandObservationAt = nil
+        latestThumbWorldPosition = nil
+        latestThumbWorldDirection = nil
         pipetteCalibrationState = .idle
         pipetteCalibrationState.selectedHand = selectedHand
         pipetteCalibrationState.step = selectedHand == nil ? .handNotSelected : .waitingForHand
@@ -439,6 +438,11 @@ final class TrackingManager {
             return
         }
 
+        lastSelectedHandObservationAt = Date()
+        latestThumbWorldPosition = observation.thumbWorldPosition
+        if let thumbWorldDirection = observation.thumbWorldDirection {
+            latestThumbWorldDirection = thumbWorldDirection
+        }
         selectedHandSeenRecently = true
 
         switch pipetteCalibrationState.step {
@@ -474,7 +478,20 @@ final class TrackingManager {
     }
 
     private func handleSelectedHandLoss() {
+        guard shouldTreatSelectedHandAsLost(at: Date()) else {
+            selectedHandSeenRecently = true
+            latestThumbWorldPosition = nil
+            latestThumbWorldDirection = nil
+            latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
+            updatePipetteTrackingStatus()
+            publishSnapshot()
+            return
+        }
+
         selectedHandSeenRecently = false
+        lastSelectedHandObservationAt = nil
+        latestThumbWorldPosition = nil
+        latestThumbWorldDirection = nil
         latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
 
         if pipetteHandedness != nil,
@@ -494,6 +511,8 @@ final class TrackingManager {
         ) else {
             pipetteCalibrationState.step = .failed
             pipetteCalibrationState.errorMessage = "Thumb travel was too small to calibrate. Try pressing further and recapture."
+            latestThumbWorldPosition = nil
+            latestThumbWorldDirection = nil
             latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
             return
         }
@@ -511,60 +530,57 @@ final class TrackingManager {
         }
 
         guard
-            let wrist = jointPosition(.forearmWrist, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let indexKnuckle = jointPosition(.indexFingerKnuckle, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let littleKnuckle = jointPosition(.littleFingerKnuckle, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let thumbTip = jointPosition(.thumbTip, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let indexTip = jointPosition(.indexFingerTip, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let middleKnuckle = jointPosition(.middleFingerKnuckle, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let middleTip = jointPosition(.middleFingerTip, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let ringKnuckle = jointPosition(.ringFingerKnuckle, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let ringTip = jointPosition(.ringFingerTip, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform),
-            let littleTip = jointPosition(.littleFingerTip, in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform)
+            let thumbPadLocalPoint = thumbTrackingPoint(in: handSkeleton),
+            let thumbPadWorldPoint = thumbTrackingPoint(in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform)
         else {
             return nil
         }
 
-        guard let handFrame = makeHandFrame(wrist: wrist, indexKnuckle: indexKnuckle, littleKnuckle: littleKnuckle) else {
-            return nil
-        }
-
-        let gripConfidence = average([
-            gripScore(wrist: wrist, knuckle: indexKnuckle, tip: indexTip),
-            gripScore(wrist: wrist, knuckle: middleKnuckle, tip: middleTip),
-            gripScore(wrist: wrist, knuckle: ringKnuckle, tip: ringTip),
-            gripScore(wrist: wrist, knuckle: littleKnuckle, tip: littleTip)
-        ])
+        let thumbDirection =
+            pipetteDirection(in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform)
+            ?? thumbDirection(in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform)
 
         return PipetteHandObservation(
-            thumbLocalPosition: handFrame.localCoordinates(of: thumbTip),
-            gripConfidence: gripConfidence
+            thumbLocalPosition: thumbPadLocalPoint,
+            thumbWorldPosition: thumbPadWorldPoint,
+            thumbWorldDirection: thumbDirection,
+            gripConfidence: 1
         )
     }
 
-    private func makeHandFrame(
-        wrist: SIMD3<Float>,
-        indexKnuckle: SIMD3<Float>,
-        littleKnuckle: SIMD3<Float>
-    ) -> HandFrame? {
-        let knuckleCenter = (indexKnuckle + littleKnuckle) * 0.5
-        var zAxis = knuckleCenter - wrist
-        let xReference = indexKnuckle - littleKnuckle
-
-        guard simd_length_squared(zAxis) > 0.000001, simd_length_squared(xReference) > 0.000001 else {
-            return nil
+    @available(visionOS 2.0, *)
+    private func thumbTrackingPoint(in skeleton: HandSkeleton) -> SIMD3<Float>? {
+        for joint in thumbTrackingJoints {
+            if let position = jointLocalPosition(joint, in: skeleton) {
+                return position
+            }
         }
 
-        zAxis = simd_normalize(zAxis)
-        var yAxis = simd_cross(zAxis, xReference)
-        guard simd_length_squared(yAxis) > 0.000001 else {
-            return nil
+        return nil
+    }
+
+    @available(visionOS 2.0, *)
+    private func thumbTrackingPoint(
+        in skeleton: HandSkeleton,
+        anchorTransform: simd_float4x4
+    ) -> SIMD3<Float>? {
+        for joint in thumbTrackingJoints {
+            if let position = jointPosition(joint, in: skeleton, anchorTransform: anchorTransform) {
+                return position
+            }
         }
 
-        yAxis = simd_normalize(yAxis)
-        let xAxis = simd_normalize(simd_cross(yAxis, zAxis))
+        return nil
+    }
 
-        return HandFrame(origin: wrist, xAxis: xAxis, yAxis: yAxis, zAxis: zAxis)
+    @available(visionOS 2.0, *)
+    private var thumbTrackingJoints: [HandSkeleton.JointName] {
+        let fallbackJoints: [HandSkeleton.JointName] = [
+            .thumbIntermediateTip,
+            .thumbTip,
+            .thumbKnuckle
+        ]
+        return fallbackJoints
     }
 
     @available(visionOS 2.0, *)
@@ -581,20 +597,67 @@ final class TrackingManager {
         return (anchorTransform * joint.anchorFromJointTransform).translation
     }
 
-    private func gripScore(
-        wrist: SIMD3<Float>,
-        knuckle: SIMD3<Float>,
-        tip: SIMD3<Float>
-    ) -> Float {
-        let knuckleDistance = max(simd_distance(wrist, knuckle), 0.001)
-        let tipDistance = simd_distance(wrist, tip)
-        let ratio = tipDistance / knuckleDistance
-        return simd_clamp((1.35 - ratio) / 0.55, 0, 1)
+    @available(visionOS 2.0, *)
+    private func jointLocalPosition(
+        _ jointName: HandSkeleton.JointName,
+        in skeleton: HandSkeleton
+    ) -> SIMD3<Float>? {
+        let joint = skeleton.joint(jointName)
+        guard joint.isTracked else {
+            return nil
+        }
+
+        return joint.anchorFromJointTransform.translation
     }
 
-    private func average(_ values: [Float]) -> Float {
-        guard values.isEmpty == false else { return 0 }
-        return values.reduce(0, +) / Float(values.count)
+    private func shouldTreatSelectedHandAsLost(at timestamp: Date) -> Bool {
+        guard let lastSelectedHandObservationAt else {
+            return true
+        }
+
+        return timestamp.timeIntervalSince(lastSelectedHandObservationAt) > selectedHandLossGraceInterval
+    }
+
+    @available(visionOS 2.0, *)
+    private func pipetteDirection(
+        in skeleton: HandSkeleton,
+        anchorTransform: simd_float4x4
+    ) -> SIMD3<Float>? {
+        guard
+            let wrist = jointPosition(.forearmWrist, in: skeleton, anchorTransform: anchorTransform),
+            let indexKnuckle = jointPosition(.indexFingerKnuckle, in: skeleton, anchorTransform: anchorTransform),
+            let littleKnuckle = jointPosition(.littleFingerKnuckle, in: skeleton, anchorTransform: anchorTransform)
+        else {
+            return nil
+        }
+
+        let knuckleCenter = (indexKnuckle + littleKnuckle) * 0.5
+        return normalizedDirection(knuckleCenter - wrist)
+    }
+
+    @available(visionOS 2.0, *)
+    private func thumbDirection(
+        in skeleton: HandSkeleton,
+        anchorTransform: simd_float4x4
+    ) -> SIMD3<Float>? {
+        guard
+            let thumbTip = jointPosition(.thumbTip, in: skeleton, anchorTransform: anchorTransform)
+                ?? jointPosition(.thumbIntermediateTip, in: skeleton, anchorTransform: anchorTransform),
+            let thumbKnuckle = jointPosition(.thumbKnuckle, in: skeleton, anchorTransform: anchorTransform)
+        else {
+            return nil
+        }
+
+        return normalizedDirection(thumbTip - thumbKnuckle)
+    }
+
+    private func normalizedDirection(_ delta: SIMD3<Float>) -> SIMD3<Float> {
+        let lengthSquared = simd_length_squared(delta)
+        guard lengthSquared > 0.000001 else {
+            return SIMD3<Float>(0, -1, 0)
+        }
+
+        return delta / sqrt(lengthSquared)
     }
 
     private func updatePipetteTrackingStatus() {
@@ -773,6 +836,8 @@ final class TrackingManager {
                 calibration: pipetteCalibrationState,
                 trackingStatus: pipetteTrackingStatus,
                 gripConfidence: latestPipetteOutput.gripConfidence,
+                thumbWorldPosition: latestThumbWorldPosition,
+                thumbWorldDirection: latestThumbWorldDirection,
                 isPressed: latestPipetteOutput.isPressed,
                 pressBeganAt: latestPipetteOutput.pressBeganAt,
                 pressEndedAt: latestPipetteOutput.pressEndedAt,

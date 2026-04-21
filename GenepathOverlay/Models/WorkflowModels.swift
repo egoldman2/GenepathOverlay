@@ -263,6 +263,8 @@ struct PipettePressState: Sendable, Equatable {
     var calibration: PipetteCalibrationState
     var trackingStatus: PipetteInputTrackingStatus
     var gripConfidence: Float
+    var thumbWorldPosition: SIMD3<Float>?
+    var thumbWorldDirection: SIMD3<Float>?
     var isPressed: Bool
     var pressBeganAt: Date?
     var pressEndedAt: Date?
@@ -274,6 +276,8 @@ struct PipettePressState: Sendable, Equatable {
         calibration: .idle,
         trackingStatus: .waitingForImmersiveSpace,
         gripConfidence: 0,
+        thumbWorldPosition: nil,
+        thumbWorldDirection: nil,
         isPressed: false,
         pressBeganAt: nil,
         pressEndedAt: nil,
