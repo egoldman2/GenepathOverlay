@@ -6,120 +6,26 @@ struct GuidedTransferHeroView: View {
     let isLoadingState: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 10) {
-                    PageEyebrow(title: "Active step")
-
-                    Text(primaryTitle)
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-
-                    Text(supportingDetail)
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                Text(appModel.progressLabel)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(AppUIStyle.accentColor)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(AppTintedPanel(opacity: 0.85))
-            }
-
+        VStack(alignment: .leading, spacing: 16) {
             if isLoadingState {
                 SwiftUI.ProgressView()
                     .progressViewStyle(.linear)
                     .tint(AppUIStyle.accentColor)
             }
 
-            if let step = appModel.currentStep {
-                HStack(alignment: .top, spacing: 14) {
-                    TransferRouteView(step: step)
-                    VolumeCardView(volume: step.volume)
-                }
-            }
+            CompactRunStatusView()
 
-            ValidationStatusView()
-            PipetteInputStatusCard(compact: true)
+            if shouldShowValidationStatus {
+                ValidationStatusView()
+            }
 
             WorkflowActionRow()
         }
-        .padding(24)
-        .background(AppHeroCardBackground())
+        .padding(22)
     }
 
-    private var primaryTitle: String {
-        guard appModel.currentStep != nil else {
-            return appModel.currentInstructionTitle
-        }
-        return "\(appModel.currentPhase.title) step"
-    }
-
-    private var supportingDetail: String {
-        guard appModel.currentStep != nil else {
-            return appModel.currentInstructionDetail
-        }
-
-        switch appModel.currentPhase {
-        case .aspiration:
-            return "Move to the highlighted source well and validate before continuing."
-        case .dispense:
-            return "Move to the highlighted destination well and validate before continuing."
-        }
-    }
-}
-
-struct TransferRouteView: View {
-    let step: Step
-
-    var body: some View {
-        HStack(spacing: 16) {
-            routeItem(title: "Source", value: step.source.well)
-
-            Image(systemName: "arrow.right")
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            routeItem(title: "Destination", value: step.destination.well)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
-        .background(AppTintedPanel(opacity: 0.92))
-    }
-
-    private func routeItem(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            Text(value)
-                .font(.headline)
-                .foregroundStyle(AppUIStyle.primaryTextColor)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-struct VolumeCardView: View {
-    let volume: Double
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Volume")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            Text(AppUIStyle.formattedVolume(volume))
-                .font(.headline)
-                .foregroundStyle(AppUIStyle.primaryTextColor)
-        }
-        .frame(width: 150, alignment: .leading)
-        .padding(18)
-        .background(AppTintedPanel(opacity: 0.92))
+    private var shouldShowValidationStatus: Bool {
+        appModel.uiState.validationResult != nil || appModel.uiState.errorMessage != nil
     }
 }
 
@@ -128,8 +34,6 @@ struct CompletionHeroView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            PageEyebrow(title: "Run complete")
-
             Text("Protocol completed successfully")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
 
@@ -144,7 +48,6 @@ struct CompletionHeroView: View {
             }
         }
         .padding(28)
-        .background(AppHeroCardBackground())
     }
 }
 
@@ -181,6 +84,51 @@ private struct ValidationStatusView: View {
     }
 }
 
+private struct CompactRunStatusView: View {
+    @Environment(AppModel.self) private var appModel
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 14) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(appModel.progressLabel)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(AppUIStyle.primaryTextColor)
+
+                Text(statusText)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 0)
+
+            Text(appModel.currentPhase.title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
+                .background(
+                    Capsule()
+                        .fill(Color.white.opacity(0.08))
+                )
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(18)
+        .background(TrackingGlassBackground(cornerRadius: 18))
+    }
+
+    private var statusText: String {
+        guard appModel.currentStep != nil else {
+            return "No active transfer."
+        }
+
+        if appModel.isPipettePressed {
+            return "Pipette press detected."
+        }
+
+        return "Waiting for pipette press."
+    }
+}
+
 private struct WorkflowActionRow: View {
     @Environment(AppModel.self) private var appModel
 
@@ -210,13 +158,25 @@ private struct WorkflowActionRow: View {
                     Button("Preview Wrong") {
                         appModel.validateCurrentPhase(simulatingMismatch: true)
                     }
-                    .buttonStyle(.bordered)
+                    .buttonStyle(SecondaryActionButton())
+
+                    Button("Manual Confirm") {
+                        appModel.confirmCurrentPhaseManually()
+                    }
+                    .buttonStyle(SecondaryActionButton())
                 }
             } else {
-                Button(appModel.currentPhase.actionTitle) {
-                    appModel.validateCurrentPhase()
+                HStack(spacing: 12) {
+                    Button("Check Position") {
+                        appModel.validateCurrentPhase()
+                    }
+                    .buttonStyle(PrimaryActionButton())
+
+                    Button(appModel.manualConfirmButtonTitle) {
+                        appModel.confirmCurrentPhaseManually()
+                    }
+                    .buttonStyle(SecondaryActionButton())
                 }
-                .buttonStyle(PrimaryActionButton())
             }
         case .some(.correct):
             Button(appModel.currentPhase.confirmationTitle) {
@@ -228,7 +188,7 @@ private struct WorkflowActionRow: View {
                 Button("Retry") {
                     appModel.retryValidation()
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(SecondaryActionButton())
 
                 Button("Continue Anyway") {
                     appModel.continueAnyway()
@@ -236,10 +196,17 @@ private struct WorkflowActionRow: View {
                 .buttonStyle(PrimaryActionButton())
             }
         case .some(.blocked):
-            Button("Retry Validation") {
-                appModel.retryValidation()
+            HStack(spacing: 12) {
+                Button("Try Again") {
+                    appModel.retryValidation()
+                }
+                .buttonStyle(SecondaryActionButton())
+
+                Button(appModel.manualConfirmButtonTitle) {
+                    appModel.confirmCurrentPhaseManually()
+                }
+                .buttonStyle(PrimaryActionButton())
             }
-            .buttonStyle(.bordered)
         }
     }
 }
@@ -282,7 +249,7 @@ struct TrackingCardView: View {
             }
         }
         .padding(22)
-        .background(AppCardBackground())
+        .background(TrackingGlassBackground())
     }
 }
 
@@ -336,7 +303,24 @@ private struct PipetteInputStatusCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(18)
-        .background(AppTintedPanel(opacity: compact ? 0.7 : 0.86))
+        .background(TrackingGlassBackground(cornerRadius: 18))
+    }
+}
+
+private struct TrackingGlassBackground: View {
+    var cornerRadius: CGFloat = 30
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(Color.white.opacity(0.08))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
     }
 }
 

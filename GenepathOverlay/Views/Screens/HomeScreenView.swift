@@ -15,11 +15,9 @@ struct HomeScreenView: View {
             Spacer(minLength: 0)
 
             AppSetupCard {
-                PageEyebrow(title: "GenepathOverlay")
-
                 HStack(alignment: .top, spacing: 22) {
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Vision Pro guidance for well plate workflows")
+                        Text("Vision Pro Guidance for Well Plate Workflows")
                             .font(.system(size: 34, weight: .bold, design: .rounded))
                             .fixedSize(horizontal: false, vertical: true)
 

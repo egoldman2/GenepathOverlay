@@ -14,6 +14,7 @@ import SwiftUI
 class AppModel {
     let immersiveSpaceID = "ImmersiveSpace"
     private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private var lastHandledPipetteReleaseAt: Date?
 
     enum Screen {
         case home
@@ -42,6 +43,7 @@ class AppModel {
     var sequenceEngine = SequenceEngine()
     var trackingSnapshot = TrackingSnapshot.idle
     var currentScreen: Screen = .home
+    var pipetteCalibrationOpenedFromSettings = false
     var isShowingTestWellPlate = false {
         didSet {
             trackingManager.setTestPlateSimulationEnabled(isShowingTestWellPlate)
@@ -75,7 +77,8 @@ class AppModel {
 
     var overlayHighlightedCoordinates: [PlateID: Coordinate] {
         guard let currentStep else { return [:] }
-        return [.source: currentStep.source]
+        let targetCoordinate = currentStep.coordinate(for: currentPhase)
+        return [targetCoordinate.plate: targetCoordinate]
     }
 
     var progressLabel: String {
@@ -217,6 +220,10 @@ class AppModel {
         return false
     }
 
+    var manualConfirmButtonTitle: String {
+        "Confirm Manually"
+    }
+
     var previewSteps: [Step] {
         Array(sequenceEngine.allSteps.prefix(6))
     }
@@ -240,6 +247,7 @@ class AppModel {
     func startSession() {
         trackingManager.resetPipetteCalibration(keepSelectedHand: false)
         syncTrackingSnapshot()
+        pipetteCalibrationOpenedFromSettings = false
         currentScreen = .loadProtocol
     }
 
@@ -261,8 +269,15 @@ class AppModel {
         currentScreen = .operatorChecklist
     }
 
-    func goToPipetteCalibration() {
+    func goToPipetteCalibrationFromFlow() {
         guard sequenceEngine.totalSteps > 0 else { return }
+        pipetteCalibrationOpenedFromSettings = false
+        currentScreen = .pipetteCalibration
+    }
+
+    func goToPipetteCalibrationFromSettings() {
+        guard sequenceEngine.totalSteps > 0 else { return }
+        pipetteCalibrationOpenedFromSettings = true
         currentScreen = .pipetteCalibration
     }
 
@@ -270,8 +285,13 @@ class AppModel {
         currentScreen = .workflowSettings
     }
 
+    func leavePipetteCalibration() {
+        currentScreen = pipetteCalibrationOpenedFromSettings ? .workflowSettings : .operatorChecklist
+    }
+
     func beginWorkflow() {
         guard sequenceEngine.totalSteps > 0 else { return }
+        lastHandledPipetteReleaseAt = pipetteInputState.pressEndedAt
         currentScreen = .workflow
     }
 
@@ -298,8 +318,9 @@ class AppModel {
         }
     }
 
-    func validateCurrentPhase(simulatingMismatch: Bool = false) {
-        guard let currentStep else { return }
+    @discardableResult
+    func validateCurrentPhase(simulatingMismatch: Bool = false) -> ValidationResult? {
+        guard let currentStep else { return nil }
 
         uiState.setValidating(currentPhase)
 
@@ -324,10 +345,21 @@ class AppModel {
         )
 
         uiState.setValidationResult(result, feedback: feedback)
+        return result
     }
 
     func retryValidation() {
         trackingManager.clearDetection()
+        syncTrackingSnapshot()
+        updateWorkflowPresentation()
+    }
+
+    func confirmCurrentPhaseManually() {
+        guard currentStep != nil else { return }
+
+        sequenceEngine.markWarning(for: currentPhase)
+        trackingManager.clearDetection()
+        _ = sequenceEngine.advance()
         syncTrackingSnapshot()
         updateWorkflowPresentation()
     }
@@ -399,6 +431,54 @@ class AppModel {
 
     private func syncTrackingSnapshot() {
         trackingSnapshot = trackingManager.snapshot
+        handleCompletedPipettePressIfNeeded()
+    }
+
+    private func handleCompletedPipettePressIfNeeded() {
+        guard let releaseAt = trackingSnapshot.pipetteInput.pressEndedAt,
+              releaseAt != lastHandledPipetteReleaseAt else {
+            return
+        }
+
+        lastHandledPipetteReleaseAt = releaseAt
+
+        guard currentScreen == .workflow,
+              currentStep != nil,
+              uiState.summary == nil else {
+            return
+        }
+
+        handleAutoWorkflowPipettePress()
+    }
+
+    private func handleAutoWorkflowPipettePress() {
+        guard pipetteInputState.calibration.isComplete else {
+            let result = ValidationResult.blocked("Pipette press detected, but calibration is not complete. Use manual confirm if needed.")
+            let feedback = ValidationFeedback(
+                tone: .warning,
+                title: "Pipette Not Calibrated",
+                detail: "Calibrate the pipette button, or use manual confirm if you need to continue."
+            )
+            uiState.setValidationResult(result, feedback: feedback)
+            return
+        }
+
+        guard case .ready = pipetteInputState.trackingStatus else {
+            let result = ValidationResult.blocked("Pipette press detected, but hand tracking is not ready. Use manual confirm if needed.")
+            let feedback = ValidationFeedback(
+                tone: .warning,
+                title: "Pipette Tracking Not Ready",
+                detail: pipetteTrackingMessage
+            )
+            uiState.setValidationResult(result, feedback: feedback)
+            return
+        }
+
+        guard let result = validateCurrentPhase() else { return }
+
+        if case .correct = result {
+            confirmValidationAndAdvance()
+        }
     }
 
     private func buildSessionLog(summary: WorkflowSummary) -> String {

@@ -47,7 +47,7 @@ struct UIStateManager {
         validationFeedback = ValidationFeedback(
             tone: .neutral,
             title: "\(phase.title) Ready",
-            detail: "Target \(step.coordinate(for: phase).well) on the \(step.coordinate(for: phase).plate.title.lowercased()) plate."
+            detail: "Press and release the pipette at target \(step.coordinate(for: phase).well), or confirm manually if detection misses it."
         )
     }
 

@@ -17,13 +17,13 @@ struct GenepathOverlayApp: App {
             ContentView()
                 .environment(appModel)
         }
-        .defaultSize(width: 920, height: 700)
+        .defaultSize(width: 820, height: 620)
 
         WindowGroup(id: "step-queue-window") {
             StepQueueWindowView()
                 .environment(appModel)
         }
-        .defaultSize(width: 360, height: 500)
+        .defaultSize(width: 320, height: 440)
 
         ImmersiveSpace(id: appModel.immersiveSpaceID) {
             ImmersiveView()

@@ -8,6 +8,13 @@ final class OverlayRenderer {
     private let thumbGuideLength: Float = 0.25
     private let thumbGuideThickness: Float = 0.004
     private let thumbGuideStartInset: Float = 0.02
+    private let workflowPanelScale: Float = 0.575
+    private let workflowPanelLift: Float = 0.05
+    private let workflowPanelBackOffset: Float = 0.09
+    private let overlayAccentColor = UIColor(red: 0.04, green: 0.52, blue: 1.0, alpha: 0.96)
+    private let overlayAccentGlowColor = UIColor(red: 0.20, green: 0.62, blue: 1.0, alpha: 0.92)
+    private let overlayAccentSoftColor = UIColor(red: 0.30, green: 0.68, blue: 1.0, alpha: 0.28)
+    private let overlayWhiteBeamColor = UIColor(red: 0.96, green: 0.97, blue: 1.0, alpha: 0.90)
     private var rootEntity: Entity?
     private var plateEntities: [PlateID: Entity] = [:]
     private var plateVisualEntities: [PlateID: Entity] = [:]
@@ -95,14 +102,14 @@ final class OverlayRenderer {
             if let highlightedCoordinate = highlightedCoordinates[.source] {
                 let layout = mapper.plateLayout
                 let beamHeight = max(layout.wellHighlightHeight * 10, 0.04)
-                workflowPanelEntity.position = highlightedCoordinate.normalizedPosition + SIMD3<Float>(0, beamHeight + 0.07, 0)
+                workflowPanelEntity.position = highlightedCoordinate.normalizedPosition + SIMD3<Float>(0, beamHeight + 0.07 + workflowPanelLift, workflowPanelBackOffset)
             } else {
                 let sourceAnchor = trackingSnapshot.plateAnchors[.source]
                 let sourceCenter = sourceAnchor?.localBoundsCenter ?? mapper.plateOutlineCenter(for: .source)
                 let sourceExtent = sourceAnchor?.localBoundsExtent ?? mapper.plateOutlineExtent(for: .source)
-                workflowPanelEntity.position = sourceCenter + SIMD3<Float>(0, sourceExtent.y * 0.5 + 0.045, sourceExtent.z * 0.5 + 0.12)
+                workflowPanelEntity.position = sourceCenter + SIMD3<Float>(0, sourceExtent.y * 0.5 + 0.045 + workflowPanelLift, sourceExtent.z * 0.5 + 0.12 + workflowPanelBackOffset)
             }
-            workflowPanelEntity.scale = SIMD3<Float>(repeating: 0.5)
+            workflowPanelEntity.scale = SIMD3<Float>(repeating: workflowPanelScale)
         }
 
         updateTestPlateVisibility(isVisible: showTestPlateModel)
@@ -115,9 +122,9 @@ final class OverlayRenderer {
 
         workflowPanel.removeFromParent()
         workflowPanel.name = "workflow-panel"
-        workflowPanel.position = SIMD3<Float>(0, 0.08, 0.14)
+        workflowPanel.position = SIMD3<Float>(0, 0.08 + workflowPanelLift, 0.14 + workflowPanelBackOffset)
         workflowPanel.orientation = simd_quatf()
-        workflowPanel.scale = SIMD3<Float>(repeating: 0.5)
+        workflowPanel.scale = SIMD3<Float>(repeating: workflowPanelScale)
         workflowPanel.components.set(BillboardComponent())
         sourcePlate.addChild(workflowPanel)
         workflowPanelEntity = workflowPanel
@@ -137,7 +144,7 @@ final class OverlayRenderer {
         guard thumbGuideEntity == nil else { return }
 
         let material = SimpleMaterial(
-            color: UIColor(red: 0.12, green: 0.92, blue: 0.35, alpha: 0.95),
+            color: overlayAccentGlowColor,
             roughness: 0.05,
             isMetallic: false
         )
@@ -239,8 +246,7 @@ final class OverlayRenderer {
         anchorRoot.addChild(visualRoot)
         plateVisualEntities[plate] = visualRoot
 
-        let outlineColor = UIColor(red: 0.16, green: 0.95, blue: 0.36, alpha: 0.96)
-        let outlineMaterial = SimpleMaterial(color: outlineColor, roughness: 0.1, isMetallic: false)
+        let outlineMaterial = SimpleMaterial(color: overlayAccentColor, roughness: 0.1, isMetallic: false)
         let thickness: Float = 0.0035
         var edges: [ModelEntity] = []
         for index in 0..<12 {
@@ -310,17 +316,17 @@ final class OverlayRenderer {
         root.name = "\(plate.rawValue)-highlighted-well"
 
         let haloMaterial = SimpleMaterial(
-            color: UIColor(red: 0.10, green: 0.95, blue: 1.0, alpha: 0.32),
+            color: overlayAccentSoftColor,
             roughness: 0.02,
             isMetallic: false
         )
         let glowMaterial = SimpleMaterial(
-            color: UIColor(red: 0.14, green: 0.88, blue: 1.0, alpha: 0.96),
+            color: overlayAccentGlowColor,
             roughness: 0.02,
             isMetallic: false
         )
         let beamMaterial = SimpleMaterial(
-            color: UIColor(red: 0.95, green: 0.99, blue: 1.0, alpha: 0.92),
+            color: overlayWhiteBeamColor,
             roughness: 0.01,
             isMetallic: false
         )

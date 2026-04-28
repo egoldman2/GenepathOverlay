@@ -49,13 +49,14 @@ struct ToggleImmersiveSpaceButton: View {
                 }
             }
         } label: {
-            Text(appModel.immersiveSpaceState == .open ? "Hide Mixed Reality View" : "Show Mixed Reality View")
-                .lineLimit(1)
-                .minimumScaleFactor(0.9)
-                .fixedSize(horizontal: true, vertical: false)
+            Image(systemName: "visionpro")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
         }
         .disabled(appModel.immersiveSpaceState == .inTransition)
         .animation(.none, value: 0)
-        .fontWeight(.semibold)
+        .buttonStyle(CompactIconButtonStyle())
+        .help(appModel.immersiveSpaceState == .open ? "Hide Mixed Reality View" : "Show Mixed Reality View")
     }
 }

@@ -91,7 +91,11 @@ struct ImmersiveView: View {
                         .foregroundStyle(.white)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
-                        .background(Color.green.opacity(0.88), in: Capsule())
+                        .background(Color.white.opacity(0.12), in: Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.white.opacity(0.16), lineWidth: 1)
+                        )
                 }
             } else {
                 VStack(alignment: .leading, spacing: 6) {
@@ -124,18 +128,19 @@ struct ImmersiveView: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(Color.white.opacity(0.16), in: Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.16), lineWidth: 1)
+            )
     }
 
     private var stepCardBackground: some View {
-        LinearGradient(
-            colors: [
-                Color(red: 0.09, green: 0.18, blue: 0.31).opacity(0.96),
-                Color(red: 0.10, green: 0.33, blue: 0.58).opacity(0.92),
-                Color(red: 0.13, green: 0.67, blue: 0.70).opacity(0.88)
-            ],
-            startPoint: .topLeading,
-            endPoint: .bottomTrailing
-        )
+        RoundedRectangle(cornerRadius: 26, style: .continuous)
+            .fill(AppUIStyle.containerFill.opacity(0.72))
+            .background(
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
+                    .fill(.regularMaterial)
+            )
     }
 
     private func metricPill(title: String, value: String) -> some View {
@@ -152,7 +157,11 @@ struct ImmersiveView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
-        .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .background(Color.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.12), lineWidth: 1)
+        )
     }
 
     private func formattedVolume(_ volume: Double) -> String {

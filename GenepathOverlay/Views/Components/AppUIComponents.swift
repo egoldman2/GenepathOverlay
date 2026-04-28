@@ -10,7 +10,7 @@ import SwiftUI
 enum AppUIStyle {
     static let primaryTextColor = Color(red: 0.96, green: 0.96, blue: 0.97)
     static let accentColor = Color(red: 0.04, green: 0.52, blue: 1.0)
-    static let setupCardWidth: CGFloat = 760
+    static let setupCardWidth: CGFloat = 700
     static let groupFill = Color(red: 0.19, green: 0.20, blue: 0.23)
     static let containerFill = Color(red: 0.27, green: 0.28, blue: 0.31)
     static let dividerStroke = Color.white.opacity(0.09)
@@ -82,6 +82,36 @@ struct AppSetupCard<Content: View>: View {
     }
 }
 
+struct SetupProgressIndicator: View {
+    let currentStep: Int
+    let totalSteps: Int
+
+    private var progress: CGFloat {
+        guard totalSteps > 0 else { return 0 }
+        return CGFloat(currentStep) / CGFloat(totalSteps)
+    }
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 8) {
+            Text("Step \(currentStep) of \(totalSteps)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.92))
+
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.18))
+
+                GeometryReader { proxy in
+                    Capsule()
+                        .fill(Color.white.opacity(0.96))
+                        .frame(width: max(16, proxy.size.width * progress))
+                }
+            }
+            .frame(width: 126, height: 8)
+        }
+    }
+}
+
 struct AppTintedPanel: View {
     let opacity: Double
 
@@ -110,6 +140,70 @@ struct PrimaryActionButton: ButtonStyle {
             .background(
                 Capsule()
                     .fill(AppUIStyle.accentColor.opacity(configuration.isPressed ? 0.78 : 1))
+            )
+    }
+}
+
+struct SecondaryActionButton: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.semibold)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.08))
+                    .background(
+                        Capsule()
+                            .fill(.regularMaterial)
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+    }
+}
+
+struct CompactIconButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white)
+            .frame(width: 48, height: 48)
+            .background(
+                Circle()
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.08))
+                    .background(
+                        Circle()
+                            .fill(.regularMaterial)
+                    )
+            )
+            .overlay(
+                Circle()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+    }
+}
+
+struct StepPillButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(
+                Capsule()
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.08))
+                    .background(
+                        Capsule()
+                            .fill(.regularMaterial)
+                    )
+            )
+            .overlay(
+                Capsule()
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
     }
 }

@@ -28,14 +28,18 @@ struct OperatorChecklistView: View {
         ScrollView {
             VStack(spacing: 24) {
                 AppSetupCard {
-                    Button {
-                        appModel.goToProtocolReview()
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
-                    }
-                    .buttonStyle(.bordered)
+                    HStack(alignment: .center) {
+                        Button {
+                            appModel.goToProtocolReview()
+                        } label: {
+                            Label("Back", systemImage: "chevron.left")
+                        }
+                        .buttonStyle(SecondaryActionButton())
 
-                    PageEyebrow(title: "Step 3")
+                        Spacer(minLength: 0)
+
+                        SetupProgressIndicator(currentStep: 3, totalSteps: 4)
+                    }
 
                     Text("Operator checklist")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -68,7 +72,11 @@ struct OperatorChecklistView: View {
                         Task { @MainActor in
                             await openMixedRealityIfNeeded()
                             guard mixedRealityReady else { return }
-                            appModel.goToPipetteCalibration()
+                            if appModel.isPipetteCalibrationComplete {
+                                appModel.beginWorkflow()
+                            } else {
+                                appModel.goToPipetteCalibrationFromFlow()
+                            }
                         }
                     }
                     .buttonStyle(PrimaryActionButton())
@@ -129,8 +137,23 @@ private struct OperatorChecklistToggleRow: View {
                 Spacer(minLength: 0)
             }
             .padding(18)
-            .background(AppTintedPanel(opacity: isOn ? 0.76 : 0.5))
+            .background(OperatorChecklistGlassBackground())
         }
         .buttonStyle(.plain)
+    }
+}
+
+private struct OperatorChecklistGlassBackground: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .fill(Color.white.opacity(0.08))
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
     }
 }

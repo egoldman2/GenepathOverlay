@@ -4,27 +4,46 @@ struct PipetteCalibrationSetupView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
 
+    private let infoColumns = [
+        GridItem(.flexible(), spacing: 12),
+        GridItem(.flexible(), spacing: 12)
+    ]
+
     private var canCapture: Bool {
         appModel.immersiveSpaceState == .open && appModel.selectedPipetteHand != nil
+    }
+
+    private var isSettingsMode: Bool {
+        appModel.pipetteCalibrationOpenedFromSettings
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 24) {
                 AppSetupCard {
-                    Button {
-                        appModel.goToOperatorChecklist()
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
+                    HStack(alignment: .center) {
+                        Button {
+                            appModel.leavePipetteCalibration()
+                        } label: {
+                            Label("Back", systemImage: "chevron.left")
+                        }
+                        .buttonStyle(SecondaryActionButton())
+
+                        Spacer(minLength: 0)
+
+                        if appModel.pipetteCalibrationOpenedFromSettings == false {
+                            SetupProgressIndicator(currentStep: 4, totalSteps: 4)
+                        }
                     }
-                    .buttonStyle(.bordered)
 
-                    PageEyebrow(title: "Step 4")
-
-                    Text("Pipette calibration")
+                    Text(isSettingsMode ? "Pipette Calibration" : "Pipette calibration")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text("Set the pipette hand, capture a resting thumb pose, then capture a pressed pose before starting the guided run.")
+                    Text(
+                        isSettingsMode
+                        ? "Adjust pipette setup, refresh calibration, and review the current input state."
+                        : "Set the pipette hand, capture a resting thumb pose, then capture a pressed pose before starting the guided run."
+                    )
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -36,11 +55,11 @@ struct PipetteCalibrationSetupView: View {
                                     await openMixedRealityIfNeeded()
                                 }
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(PrimaryActionButton())
                         } else {
                             Label("Mixed Reality View is open", systemImage: "visionpro")
                                 .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(AppUIStyle.accentColor)
+                                .foregroundStyle(.secondary)
                         }
 
                         HStack(spacing: 12) {
@@ -48,44 +67,64 @@ struct PipetteCalibrationSetupView: View {
                             handSelectionButton(.right)
                         }
 
-                        DetailItemView(title: "Tracking", value: appModel.pipetteTrackingMessage)
-                        DetailItemView(title: "Calibration", value: appModel.pipetteCalibrationMessage)
-                        DetailItemView(title: "Progress", value: appModel.pipetteCalibrationProgressLabel)
-                        DetailItemView(title: "Last Event", value: appModel.lastPipetteEventLabel)
+                        LazyVGrid(columns: infoColumns, alignment: .leading, spacing: 12) {
+                            CalibrationInfoCard(title: "Tracking", value: appModel.pipetteTrackingMessage)
+                            CalibrationInfoCard(title: "Calibration", value: appModel.pipetteCalibrationMessage)
+                            CalibrationInfoCard(title: "Progress", value: appModel.pipetteCalibrationProgressLabel)
+                            CalibrationInfoCard(title: "Last Event", value: appModel.lastPipetteEventLabel)
+                        }
 
                         HStack(spacing: 12) {
                             Button("Capture Rest Hold") {
                                 appModel.startRestCalibrationCapture()
                             }
-                            .buttonStyle(.borderedProminent)
+                            .buttonStyle(PrimaryActionButton())
                             .disabled(!canCapture)
 
                             Button("Capture Press Hold") {
                                 appModel.startPressedCalibrationCapture()
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(SecondaryActionButton())
                             .disabled(!canCapture)
 
                             Button("Reset Calibration") {
                                 appModel.resetPipetteCalibration()
                             }
-                            .buttonStyle(.bordered)
+                            .buttonStyle(SecondaryActionButton())
                             .disabled(appModel.selectedPipetteHand == nil)
                         }
 
-                        Text(appModel.isPipetteCalibrationComplete ? "Calibration complete. Start the guided run when ready." : "Calibration is required before the guided run can begin.")
+                        Text(
+                            appModel.isPipetteCalibrationComplete
+                            ? (isSettingsMode ? "Calibration is complete and ready to use." : "Calibration complete. Start the guided run when ready.")
+                            : (isSettingsMode ? "Use the controls above to recalibrate the pipette input when needed." : "Calibration is required before the guided run can begin.")
+                        )
                             .font(.caption)
-                            .foregroundStyle(appModel.isPipetteCalibrationComplete ? AppUIStyle.accentColor : .secondary)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(18)
-                    .background(AppTintedPanel(opacity: 0.58))
+                    .background(CalibrationGlassBackground())
 
-                    Button("Start Guided Run") {
-                        appModel.beginWorkflow()
+                    if isSettingsMode {
+                        Button("Done") {
+                            appModel.leavePipetteCalibration()
+                        }
+                        .buttonStyle(PrimaryActionButton())
+                    } else {
+                        HStack(spacing: 12) {
+                            Button("Bypass for Testing") {
+                                appModel.beginWorkflow()
+                            }
+                            .buttonStyle(SecondaryActionButton())
+
+                            Button("Start Guided Run") {
+                                appModel.beginWorkflow()
+                            }
+                            .buttonStyle(PrimaryActionButton())
+                            .disabled(!appModel.isPipetteCalibrationComplete)
+                            .opacity(appModel.isPipetteCalibrationComplete ? 1 : 0.45)
+                        }
                     }
-                    .buttonStyle(PrimaryActionButton())
-                    .disabled(!appModel.isPipetteCalibrationComplete)
-                    .opacity(appModel.isPipetteCalibrationComplete ? 1 : 0.45)
                 }
             }
         }
@@ -102,7 +141,7 @@ struct PipetteCalibrationSetupView: View {
             Button(hand.title) {
                 appModel.setPipetteHandedness(hand)
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SecondaryActionButton())
         }
     }
 
@@ -119,6 +158,45 @@ struct PipetteCalibrationSetupView: View {
         } else {
             appModel.setImmersiveSpaceState(.closed)
         }
+    }
+}
+
+private struct CalibrationInfoCard: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(CalibrationGlassBackground(cornerRadius: 18))
+    }
+}
+
+private struct CalibrationGlassBackground: View {
+    var cornerRadius: CGFloat = 20
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(Color.white.opacity(0.08))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
     }
 }
 

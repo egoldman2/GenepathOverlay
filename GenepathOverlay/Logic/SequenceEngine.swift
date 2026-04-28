@@ -30,6 +30,15 @@ struct SequenceEngine {
         currentPhase = .aspiration
     }
 
+    mutating func restartCurrentRun() {
+        for index in stepsQueue.indices {
+            stepsQueue[index].hasWarning = false
+            stepsQueue[index].dispenseWarning = false
+        }
+        currentIndex = 0
+        currentPhase = .aspiration
+    }
+
     mutating func markWarning(for phase: WorkflowPhase) {
         guard stepsQueue.indices.contains(currentIndex) else { return }
 

@@ -14,44 +14,47 @@ struct LoadProtocolView: View {
         ScrollView {
             VStack(spacing: 24) {
                 AppSetupCard {
-                    Button {
-                        appModel.goHome()
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
-                    }
-                    .buttonStyle(.bordered)
+                    HStack(alignment: .center) {
+                        Button {
+                            appModel.goHome()
+                        } label: {
+                            Label("Back", systemImage: "chevron.left")
+                        }
+                        .buttonStyle(SecondaryActionButton())
 
-                    PageEyebrow(title: "Step 1")
+                        Spacer(minLength: 0)
+
+                        SetupProgressIndicator(currentStep: 1, totalSteps: 4)
+                    }
 
                     Text("Load a transfer protocol")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text("Import the CSV to build the guided run.")
+                    Text("Select an existing CSV file or browse files to begin. File should contain source and destination well coordinates.")
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Upload the protocol file to continue.")
-                            .font(.headline)
+                    HStack(spacing: 12) {
+                        Button {
+                        } label: {
+                            Label("History", systemImage: "clock.arrow.circlepath")
+                        }
+                        .buttonStyle(SecondaryActionButton())
 
-                        Button("Import CSV") {
+                        Button {
                             appModel.showImporter()
+                        } label: {
+                            Label("Browse", systemImage: "doc")
                         }
                         .buttonStyle(PrimaryActionButton())
-
-                        Text("You will review the full list of steps before the guided run begins.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-
-                        if let errorMessage = appModel.uiState.errorMessage {
-                            Text(errorMessage)
-                                .font(.footnote)
-                                .foregroundStyle(Color.red)
-                        }
                     }
-                    .padding(20)
-                    .background(AppTintedPanel(opacity: 0.68))
+
+                    if let errorMessage = appModel.uiState.errorMessage {
+                        Text(errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(AppUIStyle.feedbackColor(for: .failure))
+                    }
                 }
             }
         }

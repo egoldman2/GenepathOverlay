@@ -73,20 +73,15 @@ struct PipetteConfirmationView: View {
                 
             }) {
                 Label("Confirm and Proceed", systemImage: "checkmark")
-                    .padding(.horizontal, 10)
-                    .font(.headline)
-                    .foregroundColor(.white)
             }
-            .tint(.gray)
+            .buttonStyle(PrimaryActionButton())
            
             Button(action: {
                 
             }) {
                 Label("Skip", systemImage: "xmark")
-                    .foregroundStyle(.gray)
-                    .padding(.horizontal, 10)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(SecondaryActionButton())
             
         }
         .padding(40)

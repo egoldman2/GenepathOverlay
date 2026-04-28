@@ -25,54 +25,41 @@ struct ErrorMessages: View {
             //Icon
             Image(systemName: "exclamationmark.triangle.fill")
                 
-                .foregroundStyle(.yellow)
+                .foregroundStyle(AppUIStyle.feedbackColor(for: .failure))
                 .font(.system(size: 60))
             
             // Title
             Text("Wrong Target Detected")
                 .font(.title)
                 .fontWeight(.bold)
+                .foregroundStyle(AppUIStyle.primaryTextColor)
                 
             // Description
             Text("STOP. A mistake has been identitified in the target tray. Please select how you will proceed.")
                 .font(.callout)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 320)
+                .foregroundStyle(.secondary)
             
            
             Button(action: {
                 //add button integration
             }) {
                 Label("Restart the plate", systemImage: "arrow.counterclockwise")
-                    .padding(.horizontal, 10)
-                    .font(.headline)
-                    .foregroundColor(.black)
             }
-            .tint(.white)
+            .buttonStyle(SecondaryActionButton())
             
             
             Button(action: {
                 //add button integration
             }) {
                 Label("Continue anyway", systemImage: "exclamationmark.triangle")
-                    .padding(.horizontal, 10)
             }
-            
+            .buttonStyle(PrimaryActionButton())
             
         }
         .padding(40)
-        .background {
-
-        // 1. We put the tint behind the glass
-
-        Color.red.opacity(0.4)
-
-
-        }
-        
-        
-        
-        .glassBackgroundEffect()
+        .background(AppCardBackground())
         
     }
 }

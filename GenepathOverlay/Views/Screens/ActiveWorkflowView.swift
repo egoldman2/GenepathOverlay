@@ -10,6 +10,7 @@ import SwiftUI
 struct ActiveWorkflowView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
 
     private var isLoadingState: Bool {
         switch appModel.uiState.appState {
@@ -43,50 +44,59 @@ struct ActiveWorkflowView: View {
     private var topBar: some View {
         HStack(alignment: .center, spacing: 16) {
             Button {
-                appModel.goToProtocolReview()
+                Task { @MainActor in
+                    await closeMixedRealityBeforeGoingBack()
+                    appModel.goToProtocolReview()
+                }
             } label: {
                 Label("Back", systemImage: "chevron.left")
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(SecondaryActionButton())
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("Guided Transfer Workflow")
+                Text(appModel.uiState.importedFileName ?? "Transfer Protocol")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
-
-                if let fileName = appModel.uiState.importedFileName {
-                    Text(fileName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 10) {
                 Button {
+                    openWindow(id: "step-queue-window")
+                } label: {
+                    Text(appModel.progressLabel)
+                        .foregroundStyle(.white)
+                }
+                .buttonStyle(StepPillButtonStyle())
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .help("Open Steps")
+
+                ToggleImmersiveSpaceButton()
+
+                Button {
                     appModel.goToWorkflowSettings()
                 } label: {
                     Image(systemName: "gearshape")
-                        .font(.headline.weight(.semibold))
-                        .frame(width: 18, height: 18)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
                 }
-                .buttonStyle(.bordered)
-
-                Button("Open Steps") {
-                    openWindow(id: "step-queue-window")
-                }
-                .buttonStyle(.bordered)
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-
-                ToggleImmersiveSpaceButton()
-                    .buttonStyle(PrimaryActionButton())
+                .buttonStyle(CompactIconButtonStyle())
+                .help("Settings")
             }
             .fixedSize(horizontal: true, vertical: false)
         }
         .padding(20)
-        .background(AppCardBackground())
+    }
+
+    @MainActor
+    private func closeMixedRealityBeforeGoingBack() async {
+        guard appModel.immersiveSpaceState != .closed else { return }
+
+        appModel.setImmersiveSpaceState(.inTransition)
+        await dismissImmersiveSpace()
+        appModel.setImmersiveSpaceState(.closed)
     }
 }

@@ -14,8 +14,6 @@ struct StepQueueWindowView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                PageEyebrow(title: "Reference")
-
                 Text("Queued steps")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
 
@@ -33,10 +31,10 @@ struct StepQueueWindowView: View {
                         }
                     }
                 }
-                .background(AppTintedPanel(opacity: 0.88))
+                .background(StepQueueGlassBackground())
             }
             .padding(26)
-            .frame(maxWidth: 380, alignment: .leading)
+            .frame(maxWidth: 340, alignment: .leading)
         }
         .foregroundStyle(AppUIStyle.primaryTextColor)
         .preferredColorScheme(.dark)
@@ -76,14 +74,33 @@ private struct StepQueueRowView: View {
         .background {
             if isCurrent {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(AppUIStyle.accentColor.opacity(0.16))
+                    .fill(Color.white.opacity(0.08))
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(.regularMaterial)
+                    )
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .stroke(AppUIStyle.accentColor.opacity(0.35), lineWidth: 1)
+                            .stroke(Color.white.opacity(0.16), lineWidth: 1)
                     )
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
             }
         }
+    }
+}
+
+private struct StepQueueGlassBackground: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .fill(Color.white.opacity(0.08))
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
     }
 }

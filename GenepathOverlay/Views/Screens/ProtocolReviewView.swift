@@ -15,14 +15,18 @@ struct ProtocolReviewView: View {
         ScrollView {
             VStack(spacing: 24) {
                 AppSetupCard {
-                    Button {
-                        appModel.goToLoadProtocol()
-                    } label: {
-                        Label("Back", systemImage: "chevron.left")
-                    }
-                    .buttonStyle(.bordered)
+                    HStack(alignment: .center) {
+                        Button {
+                            appModel.goToLoadProtocol()
+                        } label: {
+                            Label("Back", systemImage: "chevron.left")
+                        }
+                        .buttonStyle(SecondaryActionButton())
 
-                    PageEyebrow(title: "Step 2")
+                        Spacer(minLength: 0)
+
+                        SetupProgressIndicator(currentStep: 2, totalSteps: 4)
+                    }
 
                     Text("Review protocol before starting")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
@@ -36,17 +40,24 @@ struct ProtocolReviewView: View {
                         Text("Run summary")
                             .font(.headline)
 
-                        DetailItemView(title: "Loaded File", value: appModel.uiState.importedFileName ?? "No file selected")
-                        DetailItemView(title: "Total Steps", value: "\(appModel.sequenceEngine.totalSteps)")
-                    }
+                        ReviewInfoCard(
+                            title: "Loaded File",
+                            value: appModel.uiState.importedFileName ?? "No file selected"
+                        )
 
-                    VStack(alignment: .leading, spacing: 14) {
-                        DisclosureGroup(isExpanded: $isTransferListExpanded) {
+                        ReviewExpandableCard(
+                            title: "Total Steps",
+                            value: "\(appModel.sequenceEngine.totalSteps)",
+                            actionTitle: isTransferListExpanded ? "Hide >" : "View >",
+                            isExpanded: $isTransferListExpanded
+                        )
+
+                        if isTransferListExpanded {
                             VStack(alignment: .leading, spacing: 10) {
                                 TransferListHeaderRow()
 
                                 Divider()
-                                    .overlay(AppUIStyle.groupFill.opacity(0.9))
+                                    .overlay(AppUIStyle.dividerStroke)
 
                                 LazyVStack(alignment: .leading, spacing: 6) {
                                     ForEach(appModel.sequenceEngine.allSteps) { step in
@@ -54,34 +65,21 @@ struct ProtocolReviewView: View {
                                     }
                                 }
                             }
-                            .padding(.top, 12)
-                        } label: {
-                            HStack {
-                                Text("Transfer list")
-                                    .font(.headline)
-
-                                Spacer(minLength: 0)
-
-                                Text("\(appModel.sequenceEngine.totalSteps) steps")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
+                            .padding(16)
+                            .background(ReviewGlassBackground())
                         }
-                        .tint(AppUIStyle.primaryTextColor)
-                        .padding(18)
-                        .background(AppTintedPanel(opacity: 0.52))
                     }
 
                     HStack(spacing: 12) {
+                        Button("Re-import CSV") {
+                            appModel.showImporter()
+                        }
+                        .buttonStyle(SecondaryActionButton())
+
                         Button("Continue") {
                             appModel.goToOperatorChecklist()
                         }
                         .buttonStyle(PrimaryActionButton())
-
-                        Button("Re-import CSV") {
-                            appModel.showImporter()
-                        }
-                        .buttonStyle(.bordered)
                     }
                 }
             }
@@ -137,6 +135,84 @@ private struct TransferListRow: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
-            .background(AppTintedPanel(opacity: 0.72))
+            .background(ReviewGlassBackground(cornerRadius: 16))
+    }
+}
+
+private struct ReviewInfoCard: View {
+    let title: String
+    let value: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.headline)
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(minHeight: 72, alignment: .leading)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background(ReviewGlassBackground())
+    }
+}
+
+private struct ReviewExpandableCard: View {
+    let title: String
+    let value: String
+    let actionTitle: String
+    @Binding var isExpanded: Bool
+
+    var body: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isExpanded.toggle()
+            }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+
+                    Text(value)
+                        .font(.headline)
+                        .foregroundStyle(AppUIStyle.primaryTextColor)
+                }
+
+                Spacer(minLength: 0)
+
+                Text(actionTitle)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
+        .background(ReviewGlassBackground())
+    }
+}
+
+private struct ReviewGlassBackground: View {
+    var cornerRadius: CGFloat = 20
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(Color.white.opacity(0.08))
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(.regularMaterial)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
     }
 }
