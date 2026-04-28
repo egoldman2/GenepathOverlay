@@ -197,7 +197,7 @@ struct PipetteCalibrationState: Sendable, Equatable {
         case .collectingPress:
             return "Capturing pressed thumb pose (\(pressedSampleCount)/\(requiredSampleCount))."
         case .complete:
-            return "Calibration complete. Live thumb-press detection is active."
+            return "Calibration complete. Live tip tracking uses the fixed 25 cm pipette length."
         case .failed:
             return errorMessage ?? "Calibration failed. Reset and try again."
         }
@@ -265,6 +265,9 @@ struct PipettePressState: Sendable, Equatable {
     var gripConfidence: Float
     var thumbWorldPosition: SIMD3<Float>?
     var thumbWorldDirection: SIMD3<Float>?
+    var tipWorldPosition: SIMD3<Float>?
+    var tipConfidence: Float
+    var tipStatus: String
     var isPressed: Bool
     var pressBeganAt: Date?
     var pressEndedAt: Date?
@@ -278,6 +281,9 @@ struct PipettePressState: Sendable, Equatable {
         gripConfidence: 0,
         thumbWorldPosition: nil,
         thumbWorldDirection: nil,
+        tipWorldPosition: nil,
+        tipConfidence: 0,
+        tipStatus: "Tip tracking is idle.",
         isPressed: false,
         pressBeganAt: nil,
         pressEndedAt: nil,

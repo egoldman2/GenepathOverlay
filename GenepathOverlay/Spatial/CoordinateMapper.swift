@@ -50,7 +50,7 @@ struct CoordinateMapper: Sendable {
             columnSpacing: xSpacing,
             rowSpacing: zSpacing,
             wellYOffset: yOffset,
-            firstWellOffset: SIMD3<Float>(-0.0495, yOffset, -0.0315),
+            firstWellOffset: SIMD3<Float>(0.0495, yOffset, 0.0315),
             plateOutlineExtent: plateOutlineExtentValue,
             wellHighlightRadius: min(xSpacing, zSpacing) * 0.33,
             wellHighlightHeight: 0.004
@@ -101,9 +101,28 @@ struct CoordinateMapper: Sendable {
     nonisolated func localPosition(for row: Int, column: Int) -> SIMD3<Float> {
         let layout = plateLayout
         return SIMD3<Float>(
-            Float(column) * layout.columnSpacing + layout.firstWellOffset.x,
+            layout.firstWellOffset.x - Float(column) * layout.columnSpacing,
             layout.wellYOffset,
-            Float(row) * layout.rowSpacing + layout.firstWellOffset.z
+            layout.firstWellOffset.z - Float(row) * layout.rowSpacing
+        )
+    }
+
+    nonisolated func nearestCoordinate(for plate: PlateID, to localPosition: SIMD3<Float>) -> Coordinate? {
+        let layout = plateLayout
+        let column = Int(round((layout.firstWellOffset.x - localPosition.x) / layout.columnSpacing))
+        let row = Int(round((layout.firstWellOffset.z - localPosition.z) / layout.rowSpacing))
+
+        guard (0..<layout.rows).contains(row), (0..<layout.columns).contains(column) else {
+            return nil
+        }
+
+        let well = "\(layout.rowLabels[row])\(column + 1)"
+        return Coordinate(
+            plate: plate,
+            well: well,
+            row: row,
+            column: column,
+            normalizedPosition: self.localPosition(for: row, column: column)
         )
     }
 

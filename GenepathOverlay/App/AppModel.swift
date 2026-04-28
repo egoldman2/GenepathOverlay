@@ -155,6 +155,10 @@ class AppModel {
         "\(Int((pipetteInputState.gripConfidence * 100).rounded()))%"
     }
 
+    var pipetteTipConfidenceLabel: String {
+        "\(Int((pipetteInputState.tipConfidence * 100).rounded()))%"
+    }
+
     var pipetteCalibrationProgressLabel: String {
         let calibration = pipetteInputState.calibration
         return "\(calibration.restSampleCount)/\(calibration.requiredSampleCount) rest, \(calibration.pressedSampleCount)/\(calibration.requiredSampleCount) pressed"

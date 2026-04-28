@@ -4,6 +4,11 @@ import UIKit
 
 @MainActor
 final class OverlayRenderer {
+    private struct OutlineState {
+        let center: SIMD3<Float>
+        let extent: SIMD3<Float>
+    }
+
     private let thumbGuideLength: Float = 0.25
     private let thumbGuideThickness: Float = 0.004
     private let thumbGuideStartInset: Float = 0.02
@@ -21,6 +26,8 @@ final class OverlayRenderer {
     private var wellGroupEntities: [PlateID: Entity] = [:]
     private var wellEntities: [PlateID: [String: Entity]] = [:]
     private var highlightedWellEntities: [PlateID: Entity] = [:]
+    private var highlightedWellNames: [PlateID: String] = [:]
+    private var outlineStates: [PlateID: OutlineState] = [:]
     private weak var workflowPanelEntity: Entity?
     private var testPlateContainerEntity: Entity?
     private var testPlateModelEntity: Entity?
@@ -159,20 +166,35 @@ final class OverlayRenderer {
 
     private func updateThumbGuide(using trackingSnapshot: TrackingSnapshot) {
         guard let thumbGuideEntity else { return }
-        guard
-            let start = trackingSnapshot.pipetteInput.thumbWorldPosition,
-            let direction = trackingSnapshot.pipetteInput.thumbWorldDirection
-        else {
+
+        guard let start = trackingSnapshot.pipetteInput.thumbWorldPosition else {
             thumbGuideEntity.isEnabled = false
             return
         }
 
-        let normalizedDirection = simd_normalize(direction)
-        let insetStart = start + normalizedDirection * thumbGuideStartInset
-        let end = insetStart + normalizedDirection * thumbGuideLength
+        let end: SIMD3<Float>
+        if let tipWorldPosition = trackingSnapshot.pipetteInput.tipWorldPosition {
+            end = tipWorldPosition
+        } else if let direction = trackingSnapshot.pipetteInput.thumbWorldDirection {
+            end = start + simd_normalize(direction) * thumbGuideLength
+        } else {
+            thumbGuideEntity.isEnabled = false
+            return
+        }
+
+        let delta = end - start
+        let length = simd_length(delta)
+        guard length > 0.005 else {
+            thumbGuideEntity.isEnabled = false
+            return
+        }
+
+        let normalizedDirection = delta / length
+        let insetStart = start + normalizedDirection * min(thumbGuideStartInset, length * 0.35)
+        let adjustedLength = max(0.005, simd_distance(insetStart, end))
         thumbGuideEntity.isEnabled = true
         thumbGuideEntity.position = (insetStart + end) * 0.5
-        thumbGuideEntity.scale = SIMD3<Float>(1, thumbGuideLength, 1)
+        thumbGuideEntity.scale = SIMD3<Float>(1, adjustedLength, 1)
         thumbGuideEntity.orientation = simd_quatf(from: SIMD3<Float>(0, 1, 0), to: normalizedDirection)
     }
 
@@ -374,24 +396,29 @@ final class OverlayRenderer {
 
     private func updateHighlightedWell(for plate: PlateID, coordinate: Coordinate?) {
         guard let highlightEntity = highlightedWellEntities[plate] else { return }
-        if let plateWells = wellEntities[plate] {
-            for (_, wellEntity) in plateWells {
-                wellEntity.isEnabled = true
-            }
-        }
+        let previousWell = highlightedWellNames[plate]
+        let nextWell = coordinate?.well
+        guard previousWell != nextWell else { return }
 
         guard let coordinate else {
+            if let previousWell, plate == .source {
+                wellEntities[plate]?[previousWell]?.isEnabled = true
+            }
+            highlightedWellNames.removeValue(forKey: plate)
             highlightEntity.isEnabled = false
             return
         }
 
+        if let previousWell, plate == .source {
+            wellEntities[plate]?[previousWell]?.isEnabled = true
+        }
+
+        highlightedWellNames[plate] = coordinate.well
         highlightEntity.isEnabled = true
         highlightEntity.position = coordinate.normalizedPosition
 
-        if let plateWells = wellEntities[plate] {
-            for (wellName, wellEntity) in plateWells {
-                wellEntity.isEnabled = wellName != coordinate.well || plate != .source
-            }
+        if plate == .source {
+            wellEntities[plate]?[coordinate.well]?.isEnabled = false
         }
     }
 
@@ -402,6 +429,14 @@ final class OverlayRenderer {
         let clampedExtent = simd_max(extent, minimumExtent)
         let thickness = min(max(min(clampedExtent.x, clampedExtent.z) * 0.025, 0.0015), 0.004)
         let half = clampedExtent * 0.5
+        let nextState = OutlineState(center: center, extent: clampedExtent)
+
+        if let previousState = outlineStates[plate],
+           simd_distance(previousState.center, nextState.center) < 0.0005,
+           simd_distance(previousState.extent, nextState.extent) < 0.0005 {
+            return
+        }
+        outlineStates[plate] = nextState
 
         let edgeDefinitions: [(meshSize: SIMD3<Float>, position: SIMD3<Float>)] = [
             (SIMD3<Float>(clampedExtent.x, thickness, thickness), center + SIMD3<Float>(0, half.y, half.z)),

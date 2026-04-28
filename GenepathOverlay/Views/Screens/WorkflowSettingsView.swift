@@ -132,6 +132,8 @@ struct WorkflowSettingsView: View {
             SettingsDetailCard(title: "Selected Hand", value: appModel.selectedPipetteHandLabel)
             SettingsDetailCard(title: "Calibration", value: appModel.pipetteCalibrationMessage)
             SettingsDetailCard(title: "Grip Confidence", value: appModel.pipetteGripConfidenceLabel)
+            SettingsDetailCard(title: "Tip Tracking", value: appModel.pipetteInputState.tipStatus)
+            SettingsDetailCard(title: "Tip Confidence", value: appModel.pipetteTipConfidenceLabel)
             SettingsDetailCard(title: "Press State", value: appModel.pipettePressLabel)
             SettingsDetailCard(title: "Press Count", value: "\(appModel.pipetteInputState.pressCount)")
             SettingsDetailCard(title: "Last Event", value: appModel.lastPipetteEventLabel)
@@ -171,7 +173,7 @@ private struct SettingsPipetteStatusCard: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
-            Text("Hand: \(appModel.selectedPipetteHandLabel) • Grip: \(appModel.pipetteGripConfidenceLabel) • Presses: \(appModel.pipetteInputState.pressCount)")
+            Text("Hand: \(appModel.selectedPipetteHandLabel) • Grip: \(appModel.pipetteGripConfidenceLabel) • Tip: \(appModel.pipetteTipConfidenceLabel) • Presses: \(appModel.pipetteInputState.pressCount)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

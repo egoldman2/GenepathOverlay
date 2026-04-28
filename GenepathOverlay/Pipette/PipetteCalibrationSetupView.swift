@@ -42,7 +42,7 @@ struct PipetteCalibrationSetupView: View {
                     AppSubtitleText(
                         isSettingsMode
                         ? "Adjust pipette setup, refresh calibration, and review the current input state."
-                        : "Set the pipette hand, capture a resting thumb pose, then capture a pressed pose before starting the guided run."
+                        : "Set the pipette hand, then capture resting and pressed thumb poses for fixed-length tip tracking."
                     )
 
                     VStack(alignment: .leading, spacing: 16) {
@@ -68,6 +68,8 @@ struct PipetteCalibrationSetupView: View {
                             CalibrationInfoCard(title: "Tracking", value: appModel.pipetteTrackingMessage)
                             CalibrationInfoCard(title: "Calibration", value: appModel.pipetteCalibrationMessage)
                             CalibrationInfoCard(title: "Progress", value: appModel.pipetteCalibrationProgressLabel)
+                            CalibrationInfoCard(title: "Tip Tracking", value: appModel.pipetteInputState.tipStatus)
+                            CalibrationInfoCard(title: "Tip Confidence", value: appModel.pipetteTipConfidenceLabel)
                             CalibrationInfoCard(title: "Last Event", value: appModel.lastPipetteEventLabel)
                         }
 
