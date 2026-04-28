@@ -347,7 +347,7 @@ final class TrackingManager {
                 scheduleHandFeasibilityGateIfNeeded()
             }
 
-            trackingStatus = .searching("Object tracking is running. Look directly at the source plate to detect the reference object.")
+            trackingStatus = .searching("Object tracking is running. Look directly at the source and destination plates to detect their reference objects.")
             updatePipetteTrackingStatus()
             publishSnapshot()
 
@@ -424,7 +424,6 @@ final class TrackingManager {
             localBoundsExtent: anchor.boundingBox.extent,
             confidence: confidence
         )
-
         trackingStatus = anchor.isTracked
             ? .tracking
             : .lowConfidence("Tracking confidence dropped for the \(plate.title.lowercased()) plate.")
@@ -550,13 +549,9 @@ final class TrackingManager {
 
     @available(visionOS 2.0, *)
     private func thumbTrackingPoint(in skeleton: HandSkeleton) -> SIMD3<Float>? {
-        for joint in thumbTrackingJoints {
-            if let position = jointLocalPosition(joint, in: skeleton) {
-                return position
-            }
-        }
-
-        return nil
+        thumbTrackingPoint(using: { joint in
+            jointLocalPosition(joint, in: skeleton)
+        })
     }
 
     @available(visionOS 2.0, *)
@@ -564,23 +559,37 @@ final class TrackingManager {
         in skeleton: HandSkeleton,
         anchorTransform: simd_float4x4
     ) -> SIMD3<Float>? {
-        for joint in thumbTrackingJoints {
-            if let position = jointPosition(joint, in: skeleton, anchorTransform: anchorTransform) {
-                return position
-            }
-        }
-
-        return nil
+        thumbTrackingPoint(using: { joint in
+            jointPosition(joint, in: skeleton, anchorTransform: anchorTransform)
+        })
     }
 
     @available(visionOS 2.0, *)
     private var thumbTrackingJoints: [HandSkeleton.JointName] {
         let fallbackJoints: [HandSkeleton.JointName] = [
-            .thumbIntermediateTip,
             .thumbTip,
+            .thumbIntermediateTip,
             .thumbKnuckle
         ]
         return fallbackJoints
+    }
+
+    @available(visionOS 2.0, *)
+    private func thumbTrackingPoint(
+        using positionForJoint: (HandSkeleton.JointName) -> SIMD3<Float>?
+    ) -> SIMD3<Float>? {
+        if let tip = positionForJoint(.thumbTip),
+           let intermediate = positionForJoint(.thumbIntermediateTip) {
+            return tip * 0.75 + intermediate * 0.25
+        }
+
+        for joint in thumbTrackingJoints {
+            if let position = positionForJoint(joint) {
+                return position
+            }
+        }
+
+        return nil
     }
 
     @available(visionOS 2.0, *)
@@ -770,11 +779,11 @@ final class TrackingManager {
             let plate: PlateID
 
             if normalizedName.contains("destination") || normalizedName.contains("dest") {
-                plate = .destination
-            } else if normalizedName.contains("source") {
                 plate = .source
+            } else if normalizedName.contains("source") {
+                plate = .destination
             } else {
-                plate = index == 0 ? .source : .destination
+                plate = index == 0 ? .destination : .source
             }
 
             referenceObjectAssignments[referenceObject.id] = plate

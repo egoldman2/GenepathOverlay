@@ -4,7 +4,6 @@ import UIKit
 
 @MainActor
 final class OverlayRenderer {
-    private let plateVisualCorrection = simd_quatf(angle: .pi, axis: SIMD3<Float>(0, 1, 0))
     private let thumbGuideLength: Float = 0.25
     private let thumbGuideThickness: Float = 0.004
     private let thumbGuideStartInset: Float = 0.02
@@ -40,7 +39,7 @@ final class OverlayRenderer {
                 content.add(rootEntity)
             }
             installThumbGuideIfNeeded(on: rootEntity)
-            if let workflowPanel {
+            if let workflowPanel, workflowPanelEntity == nil {
                 attachWorkflowPanelIfNeeded(workflowPanel)
             }
             updateTestPlateVisibility(isVisible: showTestPlateModel)
@@ -79,7 +78,7 @@ final class OverlayRenderer {
             let anchorState = trackingSnapshot.plateAnchors[plate]
             let anchorTransform = anchorState?.transform ?? mapper.plateWorldTransform(for: plate)
             plateEntity.transform = Transform(matrix: anchorTransform)
-            plateEntity.isEnabled = plate == .source
+            plateEntity.isEnabled = anchorState != nil || highlightedCoordinates[plate] != nil
             updateOutline(
                 for: plate,
                 center: anchorState?.localBoundsCenter ?? mapper.plateOutlineCenter(for: plate),
@@ -242,7 +241,6 @@ final class OverlayRenderer {
 
         let visualRoot = Entity()
         visualRoot.name = "\(plate.rawValue)-plate-visuals"
-        visualRoot.orientation = plateVisualCorrection
         anchorRoot.addChild(visualRoot)
         plateVisualEntities[plate] = visualRoot
 
