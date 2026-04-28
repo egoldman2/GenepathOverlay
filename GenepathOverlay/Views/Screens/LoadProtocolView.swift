@@ -30,13 +30,11 @@ struct LoadProtocolView: View {
                     Text("Load a transfer protocol")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text("Select an existing CSV file or browse files to begin. File should contain source and destination well coordinates.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    AppSubtitleText("Select an existing CSV file or browse files to begin. File should contain source and destination well coordinates.")
 
                     HStack(spacing: 12) {
                         Button {
+                            appModel.goToProtocolHistory()
                         } label: {
                             Label("History", systemImage: "clock.arrow.circlepath")
                         }

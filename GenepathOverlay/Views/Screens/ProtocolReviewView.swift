@@ -31,10 +31,7 @@ struct ProtocolReviewView: View {
                     Text("Review protocol before starting")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text("Check the loaded file and transfer list before continuing.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    AppSubtitleText("Check the loaded file and transfer list before continuing.")
 
                     VStack(alignment: .leading, spacing: 14) {
                         Text("Run summary")

@@ -44,10 +44,7 @@ struct OperatorChecklistView: View {
                     Text("Operator checklist")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text("Complete each item before starting the guided run.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                    AppSubtitleText("Complete each item before starting the guided run.")
 
                     VStack(alignment: .leading, spacing: 14) {
                         OperatorChecklistToggleRow(

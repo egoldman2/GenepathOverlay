@@ -39,14 +39,11 @@ struct PipetteCalibrationSetupView: View {
                     Text(isSettingsMode ? "Pipette Calibration" : "Pipette calibration")
                         .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    Text(
+                    AppSubtitleText(
                         isSettingsMode
                         ? "Adjust pipette setup, refresh calibration, and review the current input state."
                         : "Set the pipette hand, capture a resting thumb pose, then capture a pressed pose before starting the guided run."
                     )
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
 
                     VStack(alignment: .leading, spacing: 16) {
                         if appModel.immersiveSpaceState != .open {

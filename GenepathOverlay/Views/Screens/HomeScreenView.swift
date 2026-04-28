@@ -21,10 +21,7 @@ struct HomeScreenView: View {
                             .font(.system(size: 34, weight: .bold, design: .rounded))
                             .fixedSize(horizontal: false, vertical: true)
 
-                        Text("Guide technicians through transfer steps with mixed-reality overlays and step-by-step validation.")
-                            .font(.title3)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                        AppSubtitleText("Guide technicians through transfer steps with mixed-reality overlays and step-by-step validation.")
 
                         VStack(alignment: .leading, spacing: 12) {
                             FeatureRow(

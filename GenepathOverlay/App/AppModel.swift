@@ -19,6 +19,7 @@ class AppModel {
     enum Screen {
         case home
         case loadProtocol
+        case protocolHistory
         case protocolReview
         case operatorChecklist
         case pipetteCalibration
@@ -38,9 +39,11 @@ class AppModel {
     let validationEngine: ValidationEngine
     let trackingManager: TrackingManager
     let overlayRenderer = OverlayRenderer()
+    private let protocolHistoryStore = ProtocolHistoryStore()
 
     var uiState = UIStateManager()
     var sequenceEngine = SequenceEngine()
+    var protocolHistory: [ProtocolHistoryEntry] = []
     var trackingSnapshot = TrackingSnapshot.idle
     var currentScreen: Screen = .home
     var pipetteCalibrationOpenedFromSettings = false
@@ -57,6 +60,7 @@ class AppModel {
         csvParser = CSVParser(coordinateMapper: mapper)
         validationEngine = ValidationEngine()
         trackingManager = TrackingManager(coordinateMapper: mapper)
+        protocolHistory = protocolHistoryStore.load()
         trackingManager.onStateChange = { [weak self] in
             self?.syncTrackingSnapshot()
         }
@@ -259,6 +263,10 @@ class AppModel {
         currentScreen = .loadProtocol
     }
 
+    func goToProtocolHistory() {
+        currentScreen = .protocolHistory
+    }
+
     func goToProtocolReview() {
         guard sequenceEngine.totalSteps > 0 else { return }
         currentScreen = .protocolReview
@@ -307,6 +315,7 @@ class AppModel {
             uiState.importedFileName = url.lastPathComponent
             uiState.beginMapping()
             sequenceEngine.load(steps: steps)
+            saveProtocolHistory(fileName: url.lastPathComponent, steps: steps)
             trackingManager.startTracking()
             syncTrackingSnapshot()
             updateWorkflowPresentation()
@@ -314,6 +323,24 @@ class AppModel {
         } catch {
             sequenceEngine.reset()
             uiState.setError(error.localizedDescription)
+            currentScreen = .loadProtocol
+        }
+    }
+
+    func loadProtocolHistory(_ entry: ProtocolHistoryEntry) {
+        do {
+            let steps = try entry.makeSteps(using: coordinateMapper)
+            uiState.beginCSVLoad()
+            uiState.importedFileName = entry.fileName
+            uiState.beginMapping()
+            sequenceEngine.load(steps: steps)
+            saveProtocolHistory(fileName: entry.fileName, steps: steps)
+            trackingManager.startTracking()
+            syncTrackingSnapshot()
+            updateWorkflowPresentation()
+            currentScreen = .protocolReview
+        } catch {
+            uiState.setError("Could not reopen this saved protocol.")
             currentScreen = .loadProtocol
         }
     }
@@ -427,6 +454,11 @@ class AppModel {
 
         let summary = sequenceEngine.summary()
         uiState.complete(summary: summary, logText: buildSessionLog(summary: summary))
+    }
+
+    private func saveProtocolHistory(fileName: String, steps: [Step]) {
+        protocolHistory = protocolHistoryStore.inserting(fileName: fileName, steps: steps, into: protocolHistory)
+        protocolHistoryStore.save(protocolHistory)
     }
 
     private func syncTrackingSnapshot() {

@@ -78,7 +78,22 @@ struct AppSetupCard<Content: View>: View {
             content
         }
         .padding(34)
-        .frame(maxWidth: AppUIStyle.setupCardWidth, alignment: .leading)
+            .frame(maxWidth: AppUIStyle.setupCardWidth, alignment: .leading)
+    }
+}
+
+struct AppSubtitleText: View {
+    let text: String
+
+    init(_ text: String) {
+        self.text = text
+    }
+
+    var body: some View {
+        Text(text)
+            .font(.system(size: 19, weight: .regular, design: .rounded))
+            .foregroundStyle(Color.white.opacity(0.68))
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 

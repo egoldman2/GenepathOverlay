@@ -51,10 +51,7 @@ struct WorkflowSettingsView: View {
             Text("Settings")
                 .font(.system(size: 34, weight: .bold, design: .rounded))
 
-            Text("Choose a setting to adjust for the guided run.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            AppSubtitleText("Choose a setting to adjust for the guided run.")
 
             VStack(alignment: .leading, spacing: 10) {
                 SettingsOptionRow(
@@ -90,10 +87,7 @@ struct WorkflowSettingsView: View {
             Text("Tracking and Alignment")
                 .font(.system(size: 34, weight: .bold, design: .rounded))
 
-            Text("Manage plate tracking and preview alignment options.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            AppSubtitleText("Manage plate tracking and preview alignment options.")
 
             SettingsDetailCard(title: "Tracking Status", value: appModel.trackingMessage)
             SettingsDetailCard(title: "Reference Objects", value: appModel.bundledReferenceObjectsLabel)
@@ -130,10 +124,7 @@ struct WorkflowSettingsView: View {
             Text("Pipette Button")
                 .font(.system(size: 34, weight: .bold, design: .rounded))
 
-            Text("View the current pipette input state and calibration status.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+            AppSubtitleText("View the current pipette input state and calibration status.")
 
             SettingsPipetteStatusCard()
 

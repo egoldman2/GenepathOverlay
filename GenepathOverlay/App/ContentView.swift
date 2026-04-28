@@ -18,6 +18,8 @@ struct ContentView: View {
                 HomeScreenView()
             case .loadProtocol:
                 LoadProtocolView()
+            case .protocolHistory:
+                ProtocolHistoryView()
             case .protocolReview:
                 ProtocolReviewView()
             case .operatorChecklist:

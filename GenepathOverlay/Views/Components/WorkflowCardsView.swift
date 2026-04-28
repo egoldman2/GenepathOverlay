@@ -37,9 +37,7 @@ struct CompletionHeroView: View {
             Text("Protocol completed successfully")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
 
-            Text("The guided transfer sequence has finished. Review the summary below and export the session log if needed.")
-                .font(.title3)
-                .foregroundStyle(.secondary)
+            AppSubtitleText("The guided transfer sequence has finished. Review the summary below and export the session log if needed.")
 
             HStack(spacing: 14) {
                 DetailItemView(title: "Total Steps", value: "\(summary.totalSteps)")
