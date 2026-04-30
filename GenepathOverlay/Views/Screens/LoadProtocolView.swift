@@ -58,3 +58,7 @@ struct LoadProtocolView: View {
         }
     }
 }
+
+#Preview {
+    LoadProtocolView()
+}

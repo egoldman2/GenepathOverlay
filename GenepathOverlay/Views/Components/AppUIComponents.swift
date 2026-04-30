@@ -146,80 +146,96 @@ struct AppTintedPanel: View {
 }
 
 struct PrimaryActionButton: ButtonStyle {
+    private let shape = Capsule()
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .fontWeight(.semibold)
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
+            .contentShape([.interaction, .hoverEffect], shape)
             .background(
-                Capsule()
+                shape
                     .fill(AppUIStyle.accentColor.opacity(configuration.isPressed ? 0.78 : 1))
             )
+            .hoverEffect(.lift)
     }
 }
 
 struct SecondaryActionButton: ButtonStyle {
+    private let shape = Capsule()
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .fontWeight(.semibold)
             .foregroundStyle(.white)
             .padding(.horizontal, 18)
             .padding(.vertical, 12)
+            .contentShape([.interaction, .hoverEffect], shape)
             .background(
-                Capsule()
+                shape
                     .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.08))
                     .background(
-                        Capsule()
+                        shape
                             .fill(.regularMaterial)
                     )
             )
             .overlay(
-                Capsule()
+                shape
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
+            .hoverEffect(.lift)
     }
 }
 
 struct CompactIconButtonStyle: ButtonStyle {
+    private let shape = Circle()
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .foregroundStyle(.white)
             .frame(width: 48, height: 48)
+            .contentShape([.interaction, .hoverEffect], shape)
             .background(
-                Circle()
+                shape
                     .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.08))
                     .background(
-                        Circle()
+                        shape
                             .fill(.regularMaterial)
                     )
             )
             .overlay(
-                Circle()
+                shape
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
+            .hoverEffect(.lift)
     }
 }
 
 struct StepPillButtonStyle: ButtonStyle {
+    private let shape = Capsule()
+
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.headline.weight(.semibold))
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
             .padding(.vertical, 12)
+            .contentShape([.interaction, .hoverEffect], shape)
             .background(
-                Capsule()
+                shape
                     .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.08))
                     .background(
-                        Capsule()
+                        shape
                             .fill(.regularMaterial)
                     )
             )
             .overlay(
-                Capsule()
+                shape
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
+            .hoverEffect(.lift)
     }
 }
 

@@ -187,13 +187,12 @@ private struct ReviewExpandableCard: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.secondary)
             }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 14)
             .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-            .contentShape(Rectangle())
+            .background(ReviewGlassBackground())
         }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(ReviewGlassBackground())
+        .buttonStyle(ReviewCardButtonStyle())
     }
 }
 
@@ -211,5 +210,16 @@ private struct ReviewGlassBackground: View {
                 RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
+    }
+}
+
+private struct ReviewCardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .hoverEffect(.highlight)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

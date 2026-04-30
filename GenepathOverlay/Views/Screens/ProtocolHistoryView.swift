@@ -141,8 +141,10 @@ private struct HistoryGlassBackground: View {
 private struct HistoryCardButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
+            .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 28, style: .continuous))
             .opacity(configuration.isPressed ? 0.82 : 1)
             .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .hoverEffect(.highlight)
             .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }

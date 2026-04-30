@@ -79,18 +79,24 @@ struct PipetteCalibrationSetupView: View {
                             }
                             .buttonStyle(PrimaryActionButton())
                             .disabled(!canCapture)
+                            .opacity(canCapture ? 1 : 0.45)
+                            .hoverEffect(.lift)
 
                             Button("Capture Press Hold") {
                                 appModel.startPressedCalibrationCapture()
                             }
                             .buttonStyle(SecondaryActionButton())
                             .disabled(!canCapture)
+                            .opacity(canCapture ? 1 : 0.45)
+                            .hoverEffect(.lift)
 
                             Button("Reset Calibration") {
                                 appModel.resetPipetteCalibration()
                             }
                             .buttonStyle(SecondaryActionButton())
                             .disabled(appModel.selectedPipetteHand == nil)
+                            .opacity(appModel.selectedPipetteHand == nil ? 0.45 : 1)
+                            .hoverEffect(.lift)
                         }
 
                         Text(

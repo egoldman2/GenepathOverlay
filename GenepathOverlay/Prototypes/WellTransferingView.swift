@@ -85,6 +85,8 @@ struct WellTransferingView: View {
                         
                 }
                 .buttonStyle(.plain)
+                .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .hoverEffect(.highlight)
             } else {
                 Button(action: {
                     withAnimation { isDepositConfirmed = true }
@@ -95,6 +97,8 @@ struct WellTransferingView: View {
                         .padding()
                 }
                 .buttonStyle(.plain)
+                .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .hoverEffect(.highlight)
                 
             }
             
@@ -107,6 +111,8 @@ struct WellTransferingView: View {
                     .padding(.horizontal, 10)
             }
             .buttonStyle(.plain)
+            .contentShape(.hoverEffect, Capsule())
+            .hoverEffect(.highlight)
             
         }
         .padding(40)

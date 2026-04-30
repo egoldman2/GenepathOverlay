@@ -35,6 +35,7 @@ struct ContentView: View {
         .padding(28)
         .foregroundStyle(AppUIStyle.primaryTextColor)
         .preferredColorScheme(.dark)
+        .defaultHoverEffect(.lift)
         .task {
             appModel.prepareForLaunch()
         }

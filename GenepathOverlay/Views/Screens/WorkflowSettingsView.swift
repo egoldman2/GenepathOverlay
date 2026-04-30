@@ -225,6 +225,8 @@ private struct SettingsOptionRow: View {
             .background(SettingsGlassBackground())
         }
         .buttonStyle(.plain)
+        .contentShape(.hoverEffect, RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .hoverEffect(.highlight)
     }
 }
 

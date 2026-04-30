@@ -133,10 +133,11 @@ private struct OperatorChecklistToggleRow: View {
 
                 Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(18)
             .background(OperatorChecklistGlassBackground())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(OperatorChecklistRowButtonStyle())
     }
 }
 
@@ -152,5 +153,18 @@ private struct OperatorChecklistGlassBackground: View {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
                     .stroke(Color.white.opacity(0.14), lineWidth: 1)
             )
+    }
+}
+
+private struct OperatorChecklistRowButtonStyle: ButtonStyle {
+    private let shape = RoundedRectangle(cornerRadius: 20, style: .continuous)
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .contentShape([.interaction, .hoverEffect], shape)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .scaleEffect(configuration.isPressed ? 0.985 : 1)
+            .hoverEffect(.highlight)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
