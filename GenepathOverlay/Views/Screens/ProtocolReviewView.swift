@@ -37,7 +37,7 @@ struct ProtocolReviewView: View {
                         Text("Run summary")
                             .font(.headline)
 
-                        ReviewInfoCard(
+                        ReviewFileSummary(
                             title: "Loaded File",
                             value: appModel.uiState.importedFileName ?? "No file selected"
                         )
@@ -50,19 +50,23 @@ struct ProtocolReviewView: View {
                         )
 
                         if isTransferListExpanded {
-                            VStack(alignment: .leading, spacing: 10) {
-                                TransferListHeaderRow()
-
-                                Divider()
-                                    .overlay(AppUIStyle.dividerStroke)
-
-                                LazyVStack(alignment: .leading, spacing: 6) {
+                            ScrollView {
+                                LazyVGrid(
+                                    columns: [
+                                        GridItem(.flexible(), spacing: 10),
+                                        GridItem(.flexible(), spacing: 10)
+                                    ],
+                                    alignment: .leading,
+                                    spacing: 8
+                                ) {
                                     ForEach(appModel.sequenceEngine.allSteps) { step in
                                         TransferListRow(step: step)
                                     }
                                 }
                             }
-                            .padding(16)
+                            .frame(maxHeight: 260)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
                             .background(ReviewGlassBackground())
                         }
                     }
@@ -84,59 +88,59 @@ struct ProtocolReviewView: View {
     }
 }
 
-private struct TransferListHeaderRow: View {
-    var body: some View {
-        HStack(spacing: 10) {
-            Text("Step")
-                .frame(width: 56, alignment: .leading)
-
-            Text("Source")
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text("Destination")
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            Text("Volume")
-                .frame(width: 88, alignment: .trailing)
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
-    }
-}
-
 private struct TransferListRow: View {
     let step: Step
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             Text("\(step.sequenceNumber)")
-                .font(.subheadline.weight(.semibold))
-                .frame(width: 56, alignment: .leading)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 26, height: 26)
+                .background(
+                    Circle()
+                        .fill(Color.white.opacity(0.08))
+                )
 
-            coordinatePill(step.source.well)
+            coordinateText(step.source.well)
 
-            coordinatePill(step.destination.well)
+            Image(systemName: "arrow.right")
+                .font(.caption.weight(.bold))
+                .foregroundStyle(.secondary)
+
+            coordinateText(step.destination.well)
+
+            Spacer(minLength: 4)
 
             Text(AppUIStyle.formattedVolume(step.volume))
-                .font(.subheadline.weight(.medium))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-                .frame(width: 88, alignment: .trailing)
         }
-        .padding(.vertical, 4)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(TransferChipBackground())
     }
 
-    private func coordinatePill(_ well: String) -> some View {
+    private func coordinateText(_ well: String) -> some View {
         Text(well)
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(AppUIStyle.primaryTextColor)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-            .background(ReviewGlassBackground(cornerRadius: 16))
+            .frame(minWidth: 34, alignment: .leading)
     }
 }
 
-private struct ReviewInfoCard: View {
+private struct TransferChipBackground: View {
+    var body: some View {
+        RoundedRectangle(cornerRadius: 16, style: .continuous)
+            .fill(Color.white.opacity(0.045))
+            .overlay(
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+    }
+}
+
+private struct ReviewFileSummary: View {
     let title: String
     let value: String
 
@@ -150,11 +154,8 @@ private struct ReviewInfoCard: View {
                 .font(.headline)
                 .foregroundStyle(AppUIStyle.primaryTextColor)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(minHeight: 72, alignment: .leading)
-        .padding(.horizontal, 18)
-        .padding(.vertical, 14)
-        .background(ReviewGlassBackground())
+        .padding(.horizontal, 2)
+        .padding(.bottom, 2)
     }
 }
 
