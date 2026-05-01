@@ -151,22 +151,29 @@ struct GenepathOverlayTests {
             pressThreshold: 0.0065,
             releaseThreshold: 0.0035
         )
-        let profile = try #require(PipetteTipEstimatorProfile.build(from: pressProfile))
+        let tipDirection = SIMD3<Float>(0, -1, 0)
+        let profile = try #require(PipetteTipEstimatorProfile.build(
+            from: pressProfile,
+            tipDirectionInHandSpace: tipDirection
+        ))
         var estimator = PipetteTipEstimator(smoothingSampleCount: 1)
         estimator.setProfile(profile)
 
         let thumbReference = SIMD3<Float>(0.03, 0.01, -0.02)
+        var handTransform = simd_float4x4(rotationAroundX: .pi / 2)
+        handTransform.columns.3 = SIMD4<Float>(0.2, 0.9, -0.6, 1)
         let handPose = PipetteHandPose(
-            originFromAnchorTransform: simd_float4x4(translation: SIMD3<Float>(0.2, 0.9, -0.6)),
+            originFromAnchorTransform: handTransform,
             gripReferencePosition: thumbReference
         )
 
         let estimatedTip = estimator.estimateTipWorldPosition(for: handPose)
         let tip = try #require(estimatedTip)
-        let expectedTip = handPose.worldPosition(forAnchorPosition: thumbReference + profile.tipOffsetInHandSpace)
+        let expectedDirection = handPose.worldDirection(forAnchorDirection: tipDirection)
+        let expectedTip = handPose.worldPosition(forAnchorPosition: thumbReference) + expectedDirection * profile.tipLength
 
         #expect(simd_distance(tip, expectedTip) < 0.0001)
-        #expect(abs(simd_length(profile.tipOffsetInHandSpace) - 0.25) < 0.0001)
+        #expect(abs(profile.tipLength - 0.25) < 0.0001)
     }
 
     @Test func pipetteTipResolverDetectsNearestWellFromWorldTip() throws {
@@ -189,13 +196,13 @@ struct GenepathOverlayTests {
         #expect((resolution.detectedPose?.confidence ?? 0) >= 0.55)
     }
 
-    @Test func pipetteTipResolverRejectsTipBetweenWells() throws {
+    @Test func pipetteTipResolverAcceptsLenientNearWellOffset() throws {
         let mapper = CoordinateMapper()
         let resolver = PipetteTipWellResolver()
         let a1 = try mapper.coordinate(for: .source, well: "A1")
         let sourceAnchor = testAnchor(for: .source, mapper: mapper)
-        let betweenWells = a1.normalizedPosition + SIMD3<Float>(-0.0048, 0, -0.0048)
-        let tipWorldPosition = (sourceAnchor.transform * SIMD4<Float>(betweenWells, 1)).xyz
+        let nearWell = a1.normalizedPosition + SIMD3<Float>(0.006, 0, 0.006)
+        let tipWorldPosition = (sourceAnchor.transform * SIMD4<Float>(nearWell, 1)).xyz
 
         let resolution = resolver.resolve(
             tipWorldPosition: tipWorldPosition,
@@ -204,16 +211,16 @@ struct GenepathOverlayTests {
             calibrationConfidence: 0.9
         )
 
-        #expect(resolution.detectedPose == nil)
-        #expect(resolution.closestCoordinate != nil)
+        #expect(resolution.detectedPose != nil)
+        #expect(resolution.closestCoordinate?.well == "A1")
     }
 
-    @Test func pipetteTipResolverRejectsTipTooHighAbovePlate() throws {
+    @Test func pipetteTipResolverProjectsHighTipOntoWellPlane() throws {
         let mapper = CoordinateMapper()
         let resolver = PipetteTipWellResolver()
         let a1 = try mapper.coordinate(for: .source, well: "A1")
         let sourceAnchor = testAnchor(for: .source, mapper: mapper)
-        let highTip = a1.normalizedPosition + SIMD3<Float>(0, 0.05, 0)
+        let highTip = a1.normalizedPosition + SIMD3<Float>(0, 0.13, 0)
         let tipWorldPosition = (sourceAnchor.transform * SIMD4<Float>(highTip, 1)).xyz
 
         let resolution = resolver.resolve(
@@ -223,8 +230,9 @@ struct GenepathOverlayTests {
             calibrationConfidence: 0.9
         )
 
-        #expect(resolution.detectedPose == nil)
-        #expect(resolution.status.contains("well plane"))
+        #expect(resolution.detectedPose != nil)
+        #expect(resolution.closestCoordinate?.well == "A1")
+        #expect(abs((resolution.detectedPose?.position.y ?? .greatestFiniteMagnitude) - a1.normalizedPosition.y) < 0.0001)
     }
 
     @Test func validationAcceptsHandExtrapolatedDetectedPose() throws {
@@ -263,5 +271,15 @@ struct GenepathOverlayTests {
 private extension SIMD4 where Scalar == Float {
     var xyz: SIMD3<Float> {
         SIMD3<Float>(x, y, z)
+    }
+}
+
+private extension simd_float4x4 {
+    init(rotationAroundX angle: Float) {
+        self = matrix_identity_float4x4
+        let cosine = cos(angle)
+        let sine = sin(angle)
+        columns.1 = SIMD4<Float>(0, cosine, sine, 0)
+        columns.2 = SIMD4<Float>(0, -sine, cosine, 0)
     }
 }

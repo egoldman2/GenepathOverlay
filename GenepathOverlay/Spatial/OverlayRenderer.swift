@@ -9,9 +9,7 @@ final class OverlayRenderer {
         let extent: SIMD3<Float>
     }
 
-    private let thumbGuideLength: Float = 0.25
-    private let thumbGuideThickness: Float = 0.004
-    private let thumbGuideStartInset: Float = 0.02
+    private let estimatedTipMarkerRadius: Float = 0.007
     private let workflowPanelScale: Float = 0.575
     private let workflowPanelLift: Float = 0.05
     private let workflowPanelBackOffset: Float = 0.09
@@ -19,6 +17,7 @@ final class OverlayRenderer {
     private let overlayAccentGlowColor = UIColor(red: 0.20, green: 0.62, blue: 1.0, alpha: 0.92)
     private let overlayAccentSoftColor = UIColor(red: 0.30, green: 0.68, blue: 1.0, alpha: 0.28)
     private let overlayWhiteBeamColor = UIColor(red: 0.96, green: 0.97, blue: 1.0, alpha: 0.90)
+    private let estimatedTipColor = UIColor(red: 1.0, green: 0.18, blue: 0.08, alpha: 0.42)
     private var rootEntity: Entity?
     private var plateEntities: [PlateID: Entity] = [:]
     private var plateVisualEntities: [PlateID: Entity] = [:]
@@ -31,7 +30,7 @@ final class OverlayRenderer {
     private weak var workflowPanelEntity: Entity?
     private var testPlateContainerEntity: Entity?
     private var testPlateModelEntity: Entity?
-    private var thumbGuideEntity: ModelEntity?
+    private var estimatedTipEntity: Entity?
     private var testPlateLoadTask: Task<Void, Never>?
     private var loadedTestPlateURL: URL?
 
@@ -45,7 +44,7 @@ final class OverlayRenderer {
             if rootEntity.scene == nil {
                 content.add(rootEntity)
             }
-            installThumbGuideIfNeeded(on: rootEntity)
+            installEstimatedTipMarkerIfNeeded(on: rootEntity)
             if let workflowPanel, workflowPanelEntity == nil {
                 attachWorkflowPanelIfNeeded(workflowPanel)
             }
@@ -63,7 +62,7 @@ final class OverlayRenderer {
         }
 
         rootEntity = root
-        installThumbGuideIfNeeded(on: root)
+        installEstimatedTipMarkerIfNeeded(on: root)
         content.add(root)
 
         if let workflowPanel {
@@ -119,7 +118,7 @@ final class OverlayRenderer {
         }
 
         updateTestPlateVisibility(isVisible: showTestPlateModel)
-        updateThumbGuide(using: trackingSnapshot)
+        updateEstimatedTipMarker(using: trackingSnapshot)
     }
 
     private func attachWorkflowPanelIfNeeded(_ workflowPanel: Entity) {
@@ -146,56 +145,39 @@ final class OverlayRenderer {
         testPlateContainerEntity = container
     }
 
-    private func installThumbGuideIfNeeded(on root: Entity) {
-        guard thumbGuideEntity == nil else { return }
+    private func installEstimatedTipMarkerIfNeeded(on root: Entity) {
+        guard estimatedTipEntity == nil else { return }
 
-        let material = SimpleMaterial(
-            color: overlayAccentGlowColor,
-            roughness: 0.05,
+        let tipMaterial = SimpleMaterial(
+            color: estimatedTipColor,
+            roughness: 0.35,
             isMetallic: false
         )
-        let guide = ModelEntity(
-            mesh: .generateCylinder(height: 1, radius: thumbGuideThickness),
-            materials: [material]
+
+        let marker = Entity()
+        marker.name = "estimated-pipette-tip"
+        marker.isEnabled = false
+
+        let sphere = ModelEntity(
+            mesh: .generateSphere(radius: estimatedTipMarkerRadius),
+            materials: [tipMaterial]
         )
-        guide.name = "thumb-guide-line"
-        guide.isEnabled = false
-        root.addChild(guide)
-        thumbGuideEntity = guide
+        sphere.name = "estimated-pipette-tip-dot"
+        marker.addChild(sphere)
+
+        root.addChild(marker)
+        estimatedTipEntity = marker
     }
 
-    private func updateThumbGuide(using trackingSnapshot: TrackingSnapshot) {
-        guard let thumbGuideEntity else { return }
-
-        guard let start = trackingSnapshot.pipetteInput.thumbWorldPosition else {
-            thumbGuideEntity.isEnabled = false
+    private func updateEstimatedTipMarker(using trackingSnapshot: TrackingSnapshot) {
+        guard let estimatedTipEntity else { return }
+        guard let tipWorldPosition = trackingSnapshot.pipetteInput.tipWorldPosition else {
+            estimatedTipEntity.isEnabled = false
             return
         }
 
-        let end: SIMD3<Float>
-        if let tipWorldPosition = trackingSnapshot.pipetteInput.tipWorldPosition {
-            end = tipWorldPosition
-        } else if let direction = trackingSnapshot.pipetteInput.thumbWorldDirection {
-            end = start + simd_normalize(direction) * thumbGuideLength
-        } else {
-            thumbGuideEntity.isEnabled = false
-            return
-        }
-
-        let delta = end - start
-        let length = simd_length(delta)
-        guard length > 0.005 else {
-            thumbGuideEntity.isEnabled = false
-            return
-        }
-
-        let normalizedDirection = delta / length
-        let insetStart = start + normalizedDirection * min(thumbGuideStartInset, length * 0.35)
-        let adjustedLength = max(0.005, simd_distance(insetStart, end))
-        thumbGuideEntity.isEnabled = true
-        thumbGuideEntity.position = (insetStart + end) * 0.5
-        thumbGuideEntity.scale = SIMD3<Float>(1, adjustedLength, 1)
-        thumbGuideEntity.orientation = simd_quatf(from: SIMD3<Float>(0, 1, 0), to: normalizedDirection)
+        estimatedTipEntity.isEnabled = true
+        estimatedTipEntity.position = tipWorldPosition
     }
 
     private func updateTestPlateVisibility(isVisible: Bool) {

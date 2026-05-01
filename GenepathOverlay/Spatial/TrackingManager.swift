@@ -27,6 +27,7 @@ final class TrackingManager {
         let thumbLocalPosition: SIMD3<Float>
         let thumbWorldPosition: SIMD3<Float>
         let thumbWorldDirection: SIMD3<Float>?
+        let tipDirectionInHandSpace: SIMD3<Float>
         let handPose: PipetteHandPose
         let gripConfidence: Float
     }
@@ -67,6 +68,7 @@ final class TrackingManager {
     private var pipetteTipEstimator = PipetteTipEstimator()
     private let pipetteTipWellResolver = PipetteTipWellResolver()
     private var restCalibrationSamples: [SIMD3<Float>] = []
+    private var restTipDirectionSamples: [SIMD3<Float>] = []
     private var pressedCalibrationSamples: [SIMD3<Float>] = []
     private var latestPipetteOutput = PipettePressClassifier.Output()
     private var latestThumbWorldPosition: SIMD3<Float>?
@@ -225,6 +227,7 @@ final class TrackingManager {
         }
 
         restCalibrationSamples.removeAll()
+        restTipDirectionSamples.removeAll()
         pressedCalibrationSamples.removeAll()
         pipettePressClassifier.reset()
         pipetteTipEstimator.reset()
@@ -272,6 +275,7 @@ final class TrackingManager {
         }
 
         restCalibrationSamples.removeAll()
+        restTipDirectionSamples.removeAll()
         pressedCalibrationSamples.removeAll()
         pipettePressClassifier.reset()
         pipetteTipEstimator.reset()
@@ -498,6 +502,7 @@ final class TrackingManager {
             pipetteCalibrationState.step = .readyForRest
         case .collectingRest:
             restCalibrationSamples.append(observation.thumbLocalPosition)
+            restTipDirectionSamples.append(observation.tipDirectionInHandSpace)
             pipetteCalibrationState.restSampleCount = restCalibrationSamples.count
             if restCalibrationSamples.count >= pipetteCalibrationState.requiredSampleCount {
                 pipetteCalibrationState.step = .readyForPress
@@ -620,9 +625,13 @@ final class TrackingManager {
             return
         }
 
-        guard let tipProfile = PipetteTipEstimatorProfile.build(from: profile) else {
+        guard let restTipDirection = averagedDirection(restTipDirectionSamples),
+              let tipProfile = PipetteTipEstimatorProfile.build(
+                from: profile,
+                tipDirectionInHandSpace: restTipDirection
+              ) else {
             pipetteCalibrationState.step = .failed
-            pipetteCalibrationState.errorMessage = "Could not estimate the fixed pipette tip direction from thumb travel."
+            pipetteCalibrationState.errorMessage = "Could not initialize fixed-length pipette tip tracking."
             latestThumbWorldPosition = nil
             latestThumbWorldDirection = nil
             latestTipWorldPosition = nil
@@ -653,14 +662,20 @@ final class TrackingManager {
             return nil
         }
 
-        let thumbDirection =
-            pipetteDirection(in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform)
-            ?? thumbDirection(in: handSkeleton, anchorTransform: anchor.originFromAnchorTransform)
+        let tipDirectionInHandSpace = anchorDirection(
+            forWorldDirection: SIMD3<Float>(0, -1, 0),
+            anchorTransform: anchor.originFromAnchorTransform
+        )
+        let tipWorldDirection = worldDirection(
+            forAnchorDirection: tipDirectionInHandSpace,
+            anchorTransform: anchor.originFromAnchorTransform
+        )
 
         return PipetteHandObservation(
             thumbLocalPosition: thumbPadLocalPoint,
             thumbWorldPosition: thumbPadWorldPoint,
-            thumbWorldDirection: thumbDirection,
+            thumbWorldDirection: tipWorldDirection,
+            tipDirectionInHandSpace: tipDirectionInHandSpace,
             handPose: PipetteHandPose(
                 originFromAnchorTransform: anchor.originFromAnchorTransform,
                 gripReferencePosition: thumbPadLocalPoint
@@ -714,6 +729,28 @@ final class TrackingManager {
         return nil
     }
 
+    private func anchorDirection(
+        forWorldDirection worldDirection: SIMD3<Float>,
+        anchorTransform: simd_float4x4
+    ) -> SIMD3<Float> {
+        (simd_inverse(anchorTransform) * SIMD4<Float>(worldDirection, 0)).xyz
+    }
+
+    private func worldDirection(
+        forAnchorDirection anchorDirection: SIMD3<Float>,
+        anchorTransform: simd_float4x4
+    ) -> SIMD3<Float> {
+        (anchorTransform * SIMD4<Float>(anchorDirection, 0)).xyz
+    }
+
+    private func averagedDirection(_ samples: [SIMD3<Float>]) -> SIMD3<Float>? {
+        guard samples.isEmpty == false else { return nil }
+        let average = samples.reduce(SIMD3<Float>.zero, +) / Float(samples.count)
+        let lengthSquared = simd_length_squared(average)
+        guard lengthSquared > 0.000001 else { return nil }
+        return average / sqrt(lengthSquared)
+    }
+
     @available(visionOS 2.0, *)
     private func jointPosition(
         _ jointName: HandSkeleton.JointName,
@@ -747,48 +784,6 @@ final class TrackingManager {
         }
 
         return timestamp.timeIntervalSince(lastSelectedHandObservationAt) > selectedHandLossGraceInterval
-    }
-
-    @available(visionOS 2.0, *)
-    private func pipetteDirection(
-        in skeleton: HandSkeleton,
-        anchorTransform: simd_float4x4
-    ) -> SIMD3<Float>? {
-        guard
-            let wrist = jointPosition(.forearmWrist, in: skeleton, anchorTransform: anchorTransform),
-            let indexKnuckle = jointPosition(.indexFingerKnuckle, in: skeleton, anchorTransform: anchorTransform),
-            let littleKnuckle = jointPosition(.littleFingerKnuckle, in: skeleton, anchorTransform: anchorTransform)
-        else {
-            return nil
-        }
-
-        let knuckleCenter = (indexKnuckle + littleKnuckle) * 0.5
-        return normalizedDirection(knuckleCenter - wrist)
-    }
-
-    @available(visionOS 2.0, *)
-    private func thumbDirection(
-        in skeleton: HandSkeleton,
-        anchorTransform: simd_float4x4
-    ) -> SIMD3<Float>? {
-        guard
-            let thumbTip = jointPosition(.thumbTip, in: skeleton, anchorTransform: anchorTransform)
-                ?? jointPosition(.thumbIntermediateTip, in: skeleton, anchorTransform: anchorTransform),
-            let thumbKnuckle = jointPosition(.thumbKnuckle, in: skeleton, anchorTransform: anchorTransform)
-        else {
-            return nil
-        }
-
-        return normalizedDirection(thumbTip - thumbKnuckle)
-    }
-
-    private func normalizedDirection(_ delta: SIMD3<Float>) -> SIMD3<Float> {
-        let lengthSquared = simd_length_squared(delta)
-        guard lengthSquared > 0.000001 else {
-            return SIMD3<Float>(0, -1, 0)
-        }
-
-        return delta / sqrt(lengthSquared)
     }
 
     private func updatePipetteTrackingStatus() {

@@ -14,10 +14,14 @@ struct PipetteHandPose: Sendable, Equatable {
     func anchorPosition(forWorldPosition worldPosition: SIMD3<Float>) -> SIMD3<Float> {
         (simd_inverse(originFromAnchorTransform) * SIMD4<Float>(worldPosition, 1)).xyz
     }
+
+    func worldDirection(forAnchorDirection anchorDirection: SIMD3<Float>) -> SIMD3<Float> {
+        (originFromAnchorTransform * SIMD4<Float>(anchorDirection, 0)).xyz
+    }
 }
 
 struct PipetteTipEstimatorProfile: Sendable, Equatable {
-    let tipOffsetInHandSpace: SIMD3<Float>
+    let tipDirectionInHandSpace: SIMD3<Float>
     let tipLength: Float
 
     var calibrationConfidence: Float {
@@ -26,15 +30,17 @@ struct PipetteTipEstimatorProfile: Sendable, Equatable {
 
     static func build(
         from pressProfile: PipetteCalibrationProfile,
+        tipDirectionInHandSpace: SIMD3<Float>,
         tipLength: Float = 0.25
     ) -> PipetteTipEstimatorProfile? {
         let lengthSquared = simd_length_squared(pressProfile.pressDirection)
-        guard lengthSquared > 0.000001 else {
+        let directionLengthSquared = simd_length_squared(tipDirectionInHandSpace)
+        guard lengthSquared > 0.000001, directionLengthSquared > 0.000001 else {
             return nil
         }
 
         return PipetteTipEstimatorProfile(
-            tipOffsetInHandSpace: simd_normalize(pressProfile.pressDirection) * tipLength,
+            tipDirectionInHandSpace: tipDirectionInHandSpace / sqrt(directionLengthSquared),
             tipLength: tipLength
         )
     }
@@ -45,7 +51,7 @@ struct PipetteTipEstimator: Sendable {
     private(set) var profile: PipetteTipEstimatorProfile?
     private var smoothedTipSamples: [SIMD3<Float>] = []
 
-    init(smoothingSampleCount: Int = 5) {
+    init(smoothingSampleCount: Int = 12) {
         self.smoothingSampleCount = smoothingSampleCount
     }
 
@@ -62,9 +68,9 @@ struct PipetteTipEstimator: Sendable {
     mutating func estimateTipWorldPosition(for handPose: PipetteHandPose) -> SIMD3<Float>? {
         guard let profile else { return nil }
 
-        let rawTipPosition = handPose.worldPosition(
-            forAnchorPosition: handPose.gripReferencePosition + profile.tipOffsetInHandSpace
-        )
+        let gripWorldPosition = handPose.worldPosition(forAnchorPosition: handPose.gripReferencePosition)
+        let tipDirection = handPose.worldDirection(forAnchorDirection: profile.tipDirectionInHandSpace)
+        let rawTipPosition = gripWorldPosition + normalized(tipDirection) * profile.tipLength
 
         smoothedTipSamples.append(rawTipPosition)
         if smoothedTipSamples.count > smoothingSampleCount {
@@ -73,6 +79,12 @@ struct PipetteTipEstimator: Sendable {
 
         let total = smoothedTipSamples.reduce(SIMD3<Float>.zero, +)
         return total / Float(smoothedTipSamples.count)
+    }
+
+    private func normalized(_ vector: SIMD3<Float>) -> SIMD3<Float> {
+        let lengthSquared = simd_length_squared(vector)
+        guard lengthSquared > 0.000001 else { return SIMD3<Float>(0, -1, 0) }
+        return vector / sqrt(lengthSquared)
     }
 }
 
@@ -86,16 +98,13 @@ struct PipetteTipResolution: Sendable {
 
 struct PipetteTipWellResolver: Sendable {
     let wellTolerance: Float
-    let maximumTipHeightError: Float
     let minimumPlateConfidence: Float
 
     init(
-        wellTolerance: Float = 0.0045,
-        maximumTipHeightError: Float = 0.035,
-        minimumPlateConfidence: Float = 0.55
+        wellTolerance: Float = 0.014,
+        minimumPlateConfidence: Float = 0.10
     ) {
         self.wellTolerance = wellTolerance
-        self.maximumTipHeightError = maximumTipHeightError
         self.minimumPlateConfidence = minimumPlateConfidence
     }
 
@@ -145,48 +154,32 @@ struct PipetteTipWellResolver: Sendable {
             )
         }
 
+        let projectedLocalPosition = SIMD3<Float>(
+            bestCandidate.localPosition.x,
+            bestCandidate.coordinate.normalizedPosition.y,
+            bestCandidate.localPosition.z
+        )
         let distanceScore = scaledConfidence(
             value: bestCandidate.distanceXZ,
             maximum: wellTolerance,
             floor: 0.65
         )
-        let heightScore = scaledConfidence(
-            value: bestCandidate.heightError,
-            maximum: maximumTipHeightError,
-            floor: 0.65
-        )
-        let confidence = min(bestCandidate.plateConfidence, calibrationConfidence, distanceScore, heightScore)
-
-        guard bestCandidate.distanceXZ <= wellTolerance else {
-            return PipetteTipResolution(
-                detectedPose: nil,
-                closestCoordinate: bestCandidate.coordinate,
-                tipWorldPosition: tipWorldPosition,
-                confidence: confidence,
-                status: "Tip near \(bestCandidate.coordinate.plate.title) \(bestCandidate.coordinate.well), outside well tolerance."
-            )
-        }
-
-        guard bestCandidate.heightError <= maximumTipHeightError else {
-            return PipetteTipResolution(
-                detectedPose: nil,
-                closestCoordinate: bestCandidate.coordinate,
-                tipWorldPosition: tipWorldPosition,
-                confidence: confidence,
-                status: "Tip is too far above the well plane."
-            )
-        }
+        let confidence = min(bestCandidate.plateConfidence, calibrationConfidence, distanceScore)
+        let detectedConfidence = max(confidence, 0.30)
+        let status = bestCandidate.distanceXZ <= wellTolerance
+            ? "Tip over \(bestCandidate.coordinate.plate.title) \(bestCandidate.coordinate.well)."
+            : "Tip nearest \(bestCandidate.coordinate.plate.title) \(bestCandidate.coordinate.well)."
 
         return PipetteTipResolution(
             detectedPose: DetectedToolPose(
                 plate: bestCandidate.coordinate.plate,
-                position: bestCandidate.localPosition,
-                confidence: confidence
+                position: projectedLocalPosition,
+                confidence: detectedConfidence
             ),
             closestCoordinate: bestCandidate.coordinate,
             tipWorldPosition: tipWorldPosition,
-            confidence: confidence,
-            status: "Tip over \(bestCandidate.coordinate.plate.title) \(bestCandidate.coordinate.well)."
+            confidence: detectedConfidence,
+            status: status
         )
     }
 
