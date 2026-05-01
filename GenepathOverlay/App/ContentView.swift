@@ -11,6 +11,18 @@ import UniformTypeIdentifiers
 struct ContentView: View {
     @Environment(AppModel.self) private var appModel
 
+    private var contentPadding: CGFloat {
+        appModel.currentScreen == .workflow ? 12 : 28
+    }
+
+    private var contentWidth: CGFloat? {
+        appModel.currentScreen == .workflow ? nil : 764
+    }
+
+    private var contentHeight: CGFloat? {
+        appModel.currentScreen == .workflow ? nil : 564
+    }
+
     var body: some View {
         Group {
             switch appModel.currentScreen {
@@ -32,7 +44,8 @@ struct ContentView: View {
                 ActiveWorkflowView()
             }
         }
-        .padding(28)
+        .frame(width: contentWidth, height: contentHeight, alignment: .topLeading)
+        .padding(contentPadding)
         .foregroundStyle(AppUIStyle.primaryTextColor)
         .preferredColorScheme(.dark)
         .defaultHoverEffect(.lift)

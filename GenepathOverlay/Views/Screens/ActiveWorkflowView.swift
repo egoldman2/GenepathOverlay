@@ -10,7 +10,10 @@ import SwiftUI
 struct ActiveWorkflowView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openWindow) private var openWindow
+    @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+    private let panelWidth: CGFloat = 460
+    private let panelHeight: CGFloat = 320
 
     private var isLoadingState: Bool {
         switch appModel.uiState.appState {
@@ -23,7 +26,7 @@ struct ActiveWorkflowView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 10) {
                 topBar
 
                 if let summary = appModel.uiState.summary {
@@ -36,59 +39,85 @@ struct ActiveWorkflowView: View {
                     SessionSummaryCardView(summary: summary)
                 }
             }
-            .padding(.bottom, 24)
+            .frame(width: panelWidth, alignment: .leading)
         }
         .scrollIndicators(.hidden)
+        .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
     }
 
     private var topBar: some View {
-        HStack(alignment: .center, spacing: 16) {
+        HStack(alignment: .center, spacing: 10) {
             Button {
                 Task { @MainActor in
                     await closeMixedRealityBeforeGoingBack()
                     appModel.goToProtocolReview()
                 }
             } label: {
-                Label("Back", systemImage: "chevron.left")
+                Image(systemName: "chevron.left")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
             }
-            .buttonStyle(SecondaryActionButton())
+            .buttonStyle(CompactIconButtonStyle())
+            .help("Back")
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Workflow")
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.secondary)
+
                 Text(appModel.uiState.importedFileName ?? "Transfer Protocol")
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.headline.weight(.semibold))
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 10) {
-                Button {
-                    openWindow(id: "step-queue-window")
-                } label: {
-                    Text(appModel.progressLabel)
-                        .foregroundStyle(.white)
-                }
-                .buttonStyle(StepPillButtonStyle())
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-                .help("Open Steps")
-
-                ToggleImmersiveSpaceButton()
-
-                Button {
-                    appModel.goToWorkflowSettings()
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 22, height: 22)
-                }
-                .buttonStyle(CompactIconButtonStyle())
-                .help("Settings")
+            Button {
+                toggleStepQueueWindow()
+            } label: {
+                Text(appModel.progressLabel)
+                    .foregroundStyle(.white)
             }
+            .buttonStyle(StepPillButtonStyle())
+            .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
+            .help("Open Steps")
+
+            ToggleImmersiveSpaceButton()
+
+            Button {
+                toggleWorkflowSettingsWindow()
+            } label: {
+                Image(systemName: "gearshape")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+            }
+            .buttonStyle(CompactIconButtonStyle())
+            .help("Settings")
         }
-        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func toggleStepQueueWindow() {
+        if appModel.isStepQueueWindowOpen {
+            dismissWindow(id: "step-queue-window")
+            appModel.setStepQueueWindowOpen(false)
+        } else {
+            openWindow(id: "step-queue-window")
+            appModel.setStepQueueWindowOpen(true)
+        }
+    }
+
+    private func toggleWorkflowSettingsWindow() {
+        if appModel.isWorkflowSettingsWindowOpen {
+            dismissWindow(id: "workflow-settings-window")
+            appModel.setWorkflowSettingsWindowOpen(false)
+        } else {
+            openWindow(id: "workflow-settings-window")
+            appModel.setWorkflowSettingsWindowOpen(true)
+        }
     }
 
     @MainActor

@@ -10,9 +10,6 @@ final class OverlayRenderer {
     }
 
     private let estimatedTipMarkerRadius: Float = 0.007
-    private let workflowPanelScale: Float = 0.575
-    private let workflowPanelLift: Float = 0.05
-    private let workflowPanelBackOffset: Float = 0.09
     private let overlayAccentColor = UIColor(red: 0.04, green: 0.52, blue: 1.0, alpha: 0.96)
     private let overlayAccentGlowColor = UIColor(red: 0.20, green: 0.62, blue: 1.0, alpha: 0.92)
     private let overlayAccentSoftColor = UIColor(red: 0.30, green: 0.68, blue: 1.0, alpha: 0.28)
@@ -27,7 +24,6 @@ final class OverlayRenderer {
     private var highlightedWellEntities: [PlateID: Entity] = [:]
     private var highlightedWellNames: [PlateID: String] = [:]
     private var outlineStates: [PlateID: OutlineState] = [:]
-    private weak var workflowPanelEntity: Entity?
     private var testPlateContainerEntity: Entity?
     private var testPlateModelEntity: Entity?
     private var estimatedTipEntity: Entity?
@@ -37,7 +33,6 @@ final class OverlayRenderer {
     func installIfNeeded(
         content: inout RealityViewContent,
         mapper: CoordinateMapper,
-        workflowPanel: Entity? = nil,
         showTestPlateModel: Bool = false
     ) {
         if let rootEntity {
@@ -45,9 +40,6 @@ final class OverlayRenderer {
                 content.add(rootEntity)
             }
             installEstimatedTipMarkerIfNeeded(on: rootEntity)
-            if let workflowPanel, workflowPanelEntity == nil {
-                attachWorkflowPanelIfNeeded(workflowPanel)
-            }
             updateTestPlateVisibility(isVisible: showTestPlateModel)
             return
         }
@@ -64,10 +56,6 @@ final class OverlayRenderer {
         rootEntity = root
         installEstimatedTipMarkerIfNeeded(on: root)
         content.add(root)
-
-        if let workflowPanel {
-            attachWorkflowPanelIfNeeded(workflowPanel)
-        }
 
         installTestPlateContainerIfNeeded()
         updateTestPlateVisibility(isVisible: showTestPlateModel)
@@ -102,37 +90,8 @@ final class OverlayRenderer {
             )
         }
 
-        if let workflowPanelEntity {
-            attachWorkflowPanelIfNeeded(workflowPanelEntity)
-            if let highlightedCoordinate = highlightedCoordinates[.source] {
-                let layout = mapper.plateLayout
-                let beamHeight = max(layout.wellHighlightHeight * 10, 0.04)
-                workflowPanelEntity.position = highlightedCoordinate.normalizedPosition + SIMD3<Float>(0, beamHeight + 0.07 + workflowPanelLift, workflowPanelBackOffset)
-            } else {
-                let sourceAnchor = trackingSnapshot.plateAnchors[.source]
-                let sourceCenter = sourceAnchor?.localBoundsCenter ?? mapper.plateOutlineCenter(for: .source)
-                let sourceExtent = sourceAnchor?.localBoundsExtent ?? mapper.plateOutlineExtent(for: .source)
-                workflowPanelEntity.position = sourceCenter + SIMD3<Float>(0, sourceExtent.y * 0.5 + 0.045 + workflowPanelLift, sourceExtent.z * 0.5 + 0.12 + workflowPanelBackOffset)
-            }
-            workflowPanelEntity.scale = SIMD3<Float>(repeating: workflowPanelScale)
-        }
-
         updateTestPlateVisibility(isVisible: showTestPlateModel)
         updateEstimatedTipMarker(using: trackingSnapshot)
-    }
-
-    private func attachWorkflowPanelIfNeeded(_ workflowPanel: Entity) {
-        guard let sourcePlate = plateEntities[.source] else { return }
-        guard workflowPanel.parent !== sourcePlate else { return }
-
-        workflowPanel.removeFromParent()
-        workflowPanel.name = "workflow-panel"
-        workflowPanel.position = SIMD3<Float>(0, 0.08 + workflowPanelLift, 0.14 + workflowPanelBackOffset)
-        workflowPanel.orientation = simd_quatf()
-        workflowPanel.scale = SIMD3<Float>(repeating: workflowPanelScale)
-        workflowPanel.components.set(BillboardComponent())
-        sourcePlate.addChild(workflowPanel)
-        workflowPanelEntity = workflowPanel
     }
 
     private func installTestPlateContainerIfNeeded() {

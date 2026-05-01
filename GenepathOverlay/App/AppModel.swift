@@ -47,6 +47,8 @@ class AppModel {
     var trackingSnapshot = TrackingSnapshot.idle
     var currentScreen: Screen = .home
     var pipetteCalibrationOpenedFromSettings = false
+    var isStepQueueWindowOpen = false
+    var isWorkflowSettingsWindowOpen = false
     var isShowingTestWellPlate = false {
         didSet {
             trackingManager.setTestPlateSimulationEnabled(isShowingTestWellPlate)
@@ -79,8 +81,19 @@ class AppModel {
         sequenceEngine.currentPhase
     }
 
+    var isAwaitingTipChange: Bool {
+        sequenceEngine.isAwaitingTipChange
+    }
+
+    var tipChangeState: TipChangeState? {
+        sequenceEngine.tipChangeState
+    }
+
     var overlayHighlightedCoordinates: [PlateID: Coordinate] {
-        guard let currentStep else { return [:] }
+        guard let currentStep,
+              isAwaitingTipChange == false else {
+            return [:]
+        }
         let targetCoordinate = currentStep.coordinate(for: currentPhase)
         return [targetCoordinate.plate: targetCoordinate]
     }
@@ -94,6 +107,10 @@ class AppModel {
     }
 
     var currentInstructionTitle: String {
+        if isAwaitingTipChange {
+            return tipChangeInstructionTitle
+        }
+
         guard let currentStep else {
             return "Import a CSV to begin"
         }
@@ -103,6 +120,10 @@ class AppModel {
     }
 
     var currentInstructionDetail: String {
+        if isAwaitingTipChange {
+            return tipChangeInstructionDetail
+        }
+
         guard let currentStep else {
             return "Select a transfer CSV to build the workflow queue."
         }
@@ -215,6 +236,8 @@ class AppModel {
     }
 
     var canConfirmValidation: Bool {
+        guard isAwaitingTipChange == false else { return false }
+
         if case .some(.correct) = uiState.validationResult {
             return true
         }
@@ -222,6 +245,8 @@ class AppModel {
     }
 
     var canContinueAnyway: Bool {
+        guard isAwaitingTipChange == false else { return false }
+
         if case .some(.incorrect) = uiState.validationResult {
             return true
         }
@@ -230,6 +255,25 @@ class AppModel {
 
     var manualConfirmButtonTitle: String {
         "Confirm Manually"
+    }
+
+    var tipChangeInstructionTitle: String {
+        tipChangeState?.title ?? "Change Pipette Tip"
+    }
+
+    var tipChangeInstructionDetail: String {
+        guard let currentStep else {
+            return "Remove the used tip and attach a fresh tip before continuing."
+        }
+
+        switch tipChangeState {
+        case .awaitingEjection:
+            return "Press and release the pipette eject button to remove the used tip. The app will detect the release before allowing a fresh tip."
+        case .awaitingReplacement:
+            return "Attach a fresh tip, then continue to aspirate \(formattedVolume(currentStep.volume)) from source \(currentStep.source.well)."
+        case .none:
+            return "Remove the used tip, attach a fresh tip, then continue to aspirate \(formattedVolume(currentStep.volume)) from source \(currentStep.source.well)."
+        }
     }
 
     var previewSteps: [Step] {
@@ -297,6 +341,14 @@ class AppModel {
         currentScreen = .workflowSettings
     }
 
+    func setStepQueueWindowOpen(_ isOpen: Bool) {
+        isStepQueueWindowOpen = isOpen
+    }
+
+    func setWorkflowSettingsWindowOpen(_ isOpen: Bool) {
+        isWorkflowSettingsWindowOpen = isOpen
+    }
+
     func leavePipetteCalibration() {
         currentScreen = pipetteCalibrationOpenedFromSettings ? .workflowSettings : .operatorChecklist
     }
@@ -351,6 +403,19 @@ class AppModel {
 
     @discardableResult
     func validateCurrentPhase(simulatingMismatch: Bool = false) -> ValidationResult? {
+        guard isAwaitingTipChange == false else {
+            let result = ValidationResult.blocked("The tip change must be completed before the next transfer step.")
+            uiState.setValidationResult(
+                result,
+                feedback: ValidationFeedback(
+                    tone: .warning,
+                    title: tipChangeInstructionTitle,
+                    detail: tipChangeInstructionDetail
+                )
+            )
+            return result
+        }
+
         guard let currentStep else { return nil }
 
         uiState.setValidating(currentPhase)
@@ -385,8 +450,20 @@ class AppModel {
         updateWorkflowPresentation()
     }
 
+    func confirmTipReplacement() {
+        guard tipChangeState == .awaitingReplacement else { return }
+
+        sequenceEngine.confirmTipReplacement()
+        trackingManager.clearDetection()
+        syncTrackingSnapshot()
+        updateWorkflowPresentation()
+    }
+
     func confirmCurrentPhaseManually() {
-        guard currentStep != nil else { return }
+        guard currentStep != nil,
+              isAwaitingTipChange == false else {
+            return
+        }
 
         sequenceEngine.markWarning(for: currentPhase)
         trackingManager.clearDetection()
@@ -446,6 +523,11 @@ class AppModel {
     }
 
     private func updateWorkflowPresentation() {
+        if let currentStep, let tipChangeState {
+            uiState.setAwaitingTipChange(before: currentStep, state: tipChangeState)
+            return
+        }
+
         if let currentStep {
             uiState.setRunning(step: currentStep, phase: currentPhase)
             return
@@ -484,7 +566,43 @@ class AppModel {
             return
         }
 
+        if tipChangeState == .awaitingEjection {
+            handleTipEjectionPipettePress()
+            return
+        }
+
+        guard isAwaitingTipChange == false else { return }
+
         handleAutoWorkflowPipettePress()
+    }
+
+    private func handleTipEjectionPipettePress() {
+        guard pipetteInputState.calibration.isComplete else {
+            let result = ValidationResult.blocked("Tip eject press detected, but calibration is not complete.")
+            let feedback = ValidationFeedback(
+                tone: .warning,
+                title: "Pipette Not Calibrated",
+                detail: "Calibrate the pipette button before using eject-button tracking for tip removal."
+            )
+            uiState.setValidationResult(result, feedback: feedback)
+            return
+        }
+
+        guard case .ready = pipetteInputState.trackingStatus else {
+            let result = ValidationResult.blocked("Tip eject press detected, but hand tracking is not ready.")
+            let feedback = ValidationFeedback(
+                tone: .warning,
+                title: "Pipette Tracking Not Ready",
+                detail: pipetteTrackingMessage
+            )
+            uiState.setValidationResult(result, feedback: feedback)
+            return
+        }
+
+        sequenceEngine.confirmTipEjection()
+        trackingManager.clearDetection()
+        syncTrackingSnapshot()
+        updateWorkflowPresentation()
     }
 
     private func handleAutoWorkflowPipettePress() {

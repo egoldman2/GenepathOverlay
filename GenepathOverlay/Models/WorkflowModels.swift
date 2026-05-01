@@ -95,6 +95,20 @@ enum WorkflowPhase: String, Sendable, Equatable {
     }
 }
 
+enum TipChangeState: Sendable, Equatable {
+    case awaitingEjection
+    case awaitingReplacement
+
+    var title: String {
+        switch self {
+        case .awaitingEjection:
+            return "Eject Used Tip"
+        case .awaitingReplacement:
+            return "Attach Fresh Tip"
+        }
+    }
+}
+
 enum ValidationResult: Sendable {
     case correct
     case incorrect
@@ -311,6 +325,7 @@ enum AppState {
     case loadingCSV
     case mapping
     case runningStep(Step)
+    case awaitingTipChange(Step, TipChangeState)
     case validatingAspiration
     case validatingDispense
     case completed
@@ -325,6 +340,8 @@ enum AppState {
             return "Mapping Coordinates"
         case .runningStep(let step):
             return "Running Step \(step.sequenceNumber)"
+        case .awaitingTipChange(let step, let tipChangeState):
+            return "\(tipChangeState.title) Before Step \(step.sequenceNumber)"
         case .validatingAspiration:
             return "Validating Aspiration"
         case .validatingDispense:

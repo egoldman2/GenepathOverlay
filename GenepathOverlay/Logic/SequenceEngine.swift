@@ -4,6 +4,11 @@ struct SequenceEngine {
     private(set) var stepsQueue: [Step] = []
     private(set) var currentIndex = 0
     private(set) var currentPhase: WorkflowPhase = .aspiration
+    private(set) var tipChangeState: TipChangeState?
+
+    var isAwaitingTipChange: Bool {
+        tipChangeState != nil
+    }
 
     var currentStep: Step? {
         guard stepsQueue.indices.contains(currentIndex) else { return nil }
@@ -22,12 +27,14 @@ struct SequenceEngine {
         stepsQueue = steps
         currentIndex = 0
         currentPhase = .aspiration
+        tipChangeState = nil
     }
 
     mutating func reset() {
         stepsQueue = []
         currentIndex = 0
         currentPhase = .aspiration
+        tipChangeState = nil
     }
 
     mutating func restartCurrentRun() {
@@ -37,6 +44,7 @@ struct SequenceEngine {
         }
         currentIndex = 0
         currentPhase = .aspiration
+        tipChangeState = nil
     }
 
     mutating func markWarning(for phase: WorkflowPhase) {
@@ -51,7 +59,10 @@ struct SequenceEngine {
     }
 
     mutating func advance() -> Step? {
-        guard stepsQueue.indices.contains(currentIndex) else { return nil }
+        guard stepsQueue.indices.contains(currentIndex),
+              isAwaitingTipChange == false else {
+            return currentStep
+        }
 
         if currentPhase == .aspiration {
             currentPhase = .dispense
@@ -60,7 +71,18 @@ struct SequenceEngine {
 
         currentPhase = .aspiration
         currentIndex += 1
+        tipChangeState = stepsQueue.indices.contains(currentIndex) ? .awaitingEjection : nil
         return currentStep
+    }
+
+    mutating func confirmTipEjection() {
+        guard tipChangeState == .awaitingEjection else { return }
+        tipChangeState = .awaitingReplacement
+    }
+
+    mutating func confirmTipReplacement() {
+        guard tipChangeState == .awaitingReplacement else { return }
+        tipChangeState = nil
     }
 
     func summary() -> WorkflowSummary {

@@ -3,6 +3,11 @@ import SwiftUI
 struct WorkflowSettingsView: View {
     @Environment(AppModel.self) private var appModel
     @State private var route: SettingsRoute = .menu
+    let showsWorkflowBackButton: Bool
+
+    init(showsWorkflowBackButton: Bool = true) {
+        self.showsWorkflowBackButton = showsWorkflowBackButton
+    }
 
     var body: some View {
         ScrollView {
@@ -27,7 +32,7 @@ struct WorkflowSettingsView: View {
 
     @ViewBuilder
     private var header: some View {
-        if route == .menu {
+        if route == .menu, showsWorkflowBackButton {
             Button {
                 appModel.beginWorkflow()
             } label: {

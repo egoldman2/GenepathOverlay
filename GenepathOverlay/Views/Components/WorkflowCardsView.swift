@@ -6,7 +6,7 @@ struct GuidedTransferHeroView: View {
     let isLoadingState: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 10) {
             if isLoadingState {
                 SwiftUI.ProgressView()
                     .progressViewStyle(.linear)
@@ -21,7 +21,7 @@ struct GuidedTransferHeroView: View {
 
             WorkflowActionRow()
         }
-        .padding(22)
+        .padding(14)
     }
 
     private var shouldShowValidationStatus: Bool {
@@ -74,7 +74,7 @@ private struct ValidationStatusView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
+        .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(AppUIStyle.feedbackColor(for: appModel.uiState.validationFeedback.tone).opacity(0.12))
@@ -88,7 +88,7 @@ private struct CompactRunStatusView: View {
     var body: some View {
         HStack(alignment: .center, spacing: 14) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(appModel.progressLabel)
+                Text(statusTitle)
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(AppUIStyle.primaryTextColor)
 
@@ -99,7 +99,7 @@ private struct CompactRunStatusView: View {
 
             Spacer(minLength: 0)
 
-            Text(appModel.currentPhase.title)
+            Text(appModel.isAwaitingTipChange ? "Tip Change" : appModel.currentPhase.title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 12)
@@ -110,13 +110,25 @@ private struct CompactRunStatusView: View {
                 )
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(18)
+        .padding(12)
         .background(TrackingGlassBackground(cornerRadius: 18))
+    }
+
+    private var statusTitle: String {
+        if appModel.isAwaitingTipChange {
+            return appModel.tipChangeInstructionTitle
+        }
+
+        return appModel.progressLabel
     }
 
     private var statusText: String {
         guard appModel.currentStep != nil else {
             return "No active transfer."
+        }
+
+        if appModel.isAwaitingTipChange {
+            return appModel.tipChangeInstructionDetail
         }
 
         if appModel.isPipettePressed {
@@ -144,6 +156,25 @@ private struct WorkflowActionRow: View {
 
     @ViewBuilder
     private var actionButtons: some View {
+        if let tipChangeState = appModel.tipChangeState {
+            switch tipChangeState {
+            case .awaitingEjection:
+                Text("Waiting for eject button press")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(
+                        Capsule()
+                            .fill(Color.white.opacity(0.08))
+                    )
+            case .awaitingReplacement:
+                Button("Fresh Tip Attached") {
+                    appModel.confirmTipReplacement()
+                }
+                .buttonStyle(PrimaryActionButton())
+            }
+        } else {
         switch appModel.uiState.validationResult {
         case .none:
             if appModel.isPreviewTracking {
@@ -205,6 +236,7 @@ private struct WorkflowActionRow: View {
                 }
                 .buttonStyle(PrimaryActionButton())
             }
+        }
         }
     }
 }

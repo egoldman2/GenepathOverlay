@@ -51,6 +51,12 @@ struct UIStateManager {
         )
     }
 
+    mutating func setAwaitingTipChange(before step: Step, state: TipChangeState) {
+        appState = .awaitingTipChange(step, state)
+        validationResult = nil
+        validationFeedback = ValidationFeedback(tone: .warning, title: state.title, detail: state.detail(for: step))
+    }
+
     mutating func setValidating(_ phase: WorkflowPhase) {
         switch phase {
         case .aspiration:
@@ -86,5 +92,16 @@ struct UIStateManager {
             detail: message
         )
         appState = .idle
+    }
+}
+
+private extension TipChangeState {
+    func detail(for step: Step) -> String {
+        switch self {
+        case .awaitingEjection:
+            return "Press and release the pipette eject button to remove the used tip before aspirating from source \(step.source.well)."
+        case .awaitingReplacement:
+            return "Attach a fresh tip, then confirm before aspirating from source \(step.source.well)."
+        }
     }
 }
