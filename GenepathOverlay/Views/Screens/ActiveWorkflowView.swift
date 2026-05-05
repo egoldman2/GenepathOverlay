@@ -25,28 +25,32 @@ struct ActiveWorkflowView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 10) {
-                topBar
+        VStack(alignment: .leading, spacing: 12) {
+            topBar
 
-                if let summary = appModel.uiState.summary {
-                    CompletionHeroView(summary: summary)
-                } else {
-                    GuidedTransferHeroView(isLoadingState: isLoadingState)
+            if let summary = appModel.uiState.summary {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        CompletionHeroView(summary: summary)
+                        SessionSummaryCardView(summary: summary)
+                    }
                 }
+                .scrollIndicators(.hidden)
+            } else {
+                GuidedTransferHeroView(isLoadingState: isLoadingState)
 
-                if let summary = appModel.uiState.summary {
-                    SessionSummaryCardView(summary: summary)
-                }
+                Spacer(minLength: 0)
+
+                bottomToolBar
             }
-            .frame(width: panelWidth, alignment: .leading)
         }
-        .scrollIndicators(.hidden)
+        .padding(.horizontal, 22)
+        .padding(.vertical, 18)
         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
     }
 
     private var topBar: some View {
-        HStack(alignment: .center, spacing: 10) {
+        HStack(alignment: .center, spacing: 14) {
             Button {
                 Task { @MainActor in
                     await closeMixedRealityBeforeGoingBack()
@@ -72,6 +76,13 @@ struct ActiveWorkflowView: View {
                     .minimumScaleFactor(0.85)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var bottomToolBar: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Spacer(minLength: 0)
 
             Button {
                 toggleStepQueueWindow()
@@ -97,7 +108,7 @@ struct ActiveWorkflowView: View {
             .buttonStyle(CompactIconButtonStyle())
             .help("Settings")
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     private func toggleStepQueueWindow() {

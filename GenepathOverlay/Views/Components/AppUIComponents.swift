@@ -78,7 +78,8 @@ struct AppSetupCard<Content: View>: View {
             content
         }
         .padding(34)
-            .frame(maxWidth: AppUIStyle.setupCardWidth, alignment: .leading)
+        .frame(width: AppUIStyle.setupCardWidth, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 

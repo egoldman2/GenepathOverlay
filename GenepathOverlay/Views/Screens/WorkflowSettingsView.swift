@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WorkflowSettingsView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dismissWindow) private var dismissWindow
     @State private var route: SettingsRoute = .menu
     let showsWorkflowBackButton: Bool
 
@@ -10,18 +11,30 @@ struct WorkflowSettingsView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                AppSetupCard {
-                    header
+        Group {
+            if route == .pipetteCalibration {
+                PipetteCalibrationSetupView(isSettingsPresentation: true) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        route = .menu
+                    }
+                }
+            } else {
+                ScrollView {
+                    VStack(spacing: 24) {
+                        AppSetupCard {
+                            header
 
-                    switch route {
-                    case .menu:
-                        settingsMenu
-                    case .tracking:
-                        trackingSettings
-                    case .pipetteButton:
-                        pipetteButtonSettings
+                            switch route {
+                            case .menu:
+                                settingsMenu
+                            case .tracking:
+                                trackingSettings
+                            case .pipetteButton:
+                                pipetteButtonSettings
+                            case .pipetteCalibration:
+                                EmptyView()
+                            }
+                        }
                     }
                 }
             }
@@ -37,6 +50,14 @@ struct WorkflowSettingsView: View {
                 appModel.beginWorkflow()
             } label: {
                 Label("Back", systemImage: "chevron.left")
+            }
+            .buttonStyle(SecondaryActionButton())
+        } else if route == .menu {
+            Button {
+                dismissWindow(id: "workflow-settings-window")
+                appModel.setWorkflowSettingsWindowOpen(false)
+            } label: {
+                Label("Close", systemImage: "xmark")
             }
             .buttonStyle(SecondaryActionButton())
         } else {
@@ -81,7 +102,9 @@ struct WorkflowSettingsView: View {
                     title: "Pipette Calibration",
                     detail: "Open pipette setup and recalibration tools."
                 ) {
-                    appModel.goToPipetteCalibrationFromSettings()
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        route = .pipetteCalibration
+                    }
                 }
             }
         }
@@ -199,6 +222,7 @@ private enum SettingsRoute {
     case menu
     case tracking
     case pipetteButton
+    case pipetteCalibration
 }
 
 private struct SettingsOptionRow: View {
