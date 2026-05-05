@@ -13,7 +13,7 @@ struct ActiveWorkflowView: View {
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     private let panelWidth: CGFloat = 460
-    private let panelHeight: CGFloat = 320
+    private let panelHeight: CGFloat = 380
 
     private var isLoadingState: Bool {
         switch appModel.uiState.appState {
@@ -40,12 +40,11 @@ struct ActiveWorkflowView: View {
                 GuidedTransferHeroView(isLoadingState: isLoadingState)
 
                 Spacer(minLength: 0)
-
-                bottomToolBar
             }
         }
         .padding(.horizontal, 22)
-        .padding(.vertical, 18)
+        .padding(.top, 18)
+        .padding(.bottom, 24)
         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
     }
 
@@ -72,27 +71,29 @@ struct ActiveWorkflowView: View {
 
                 Text(appModel.uiState.importedFileName ?? "Transfer Protocol")
                     .font(.headline.weight(.semibold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.72)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+
+            if appModel.uiState.summary == nil {
+                toolBar
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private var bottomToolBar: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Spacer(minLength: 0)
-
+    private var toolBar: some View {
+        HStack(alignment: .center, spacing: 10) {
             Button {
                 toggleStepQueueWindow()
             } label: {
-                Text(appModel.progressLabel)
+                Image(systemName: "list.bullet")
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
             }
-            .buttonStyle(StepPillButtonStyle())
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
+            .buttonStyle(ToolTrayIconButtonStyle())
             .help("Open Steps")
 
             ToggleImmersiveSpaceButton()
@@ -105,7 +106,7 @@ struct ActiveWorkflowView: View {
                     .foregroundStyle(.white)
                     .frame(width: 22, height: 22)
             }
-            .buttonStyle(CompactIconButtonStyle())
+            .buttonStyle(ToolTrayIconButtonStyle())
             .help("Settings")
         }
         .frame(maxWidth: .infinity, alignment: .trailing)

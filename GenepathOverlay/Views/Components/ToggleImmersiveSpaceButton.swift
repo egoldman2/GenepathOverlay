@@ -56,7 +56,7 @@ struct ToggleImmersiveSpaceButton: View {
         }
         .disabled(appModel.immersiveSpaceState == .inTransition)
         .animation(.none, value: 0)
-        .buttonStyle(CompactIconButtonStyle())
+        .buttonStyle(ToolTrayIconButtonStyle())
         .help(appModel.immersiveSpaceState == .open ? "Hide Mixed Reality View" : "Show Mixed Reality View")
     }
 }

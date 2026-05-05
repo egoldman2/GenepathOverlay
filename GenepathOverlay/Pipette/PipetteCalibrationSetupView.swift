@@ -3,8 +3,10 @@ import SwiftUI
 struct PipetteCalibrationSetupView: View {
     @Environment(AppModel.self) private var appModel
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
+    @State private var simulatorStageOverride: CalibrationStage?
     private let settingsPresentationOverride: Bool?
     private let onBack: (() -> Void)?
+    private let calibrationActionWidth: CGFloat = 240
 
     init(
         isSettingsPresentation: Bool? = nil,
@@ -22,7 +24,7 @@ struct PipetteCalibrationSetupView: View {
         settingsPresentationOverride ?? appModel.pipetteCalibrationOpenedFromSettings
     }
 
-    private var stage: CalibrationStage {
+    private var liveStage: CalibrationStage {
         if appModel.isPipetteCalibrationComplete {
             return .ready
         }
@@ -41,19 +43,19 @@ struct PipetteCalibrationSetupView: View {
         }
     }
 
+    private var displayStage: CalibrationStage {
+        simulatorStageOverride ?? liveStage
+    }
+
     var body: some View {
         ScrollView {
             AppSetupCard {
                 header
 
-                VStack(alignment: .leading, spacing: 10) {
-                    Text(isSettingsMode ? "Pipette Calibration" : "Pipette calibration")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
+                Text(isSettingsMode ? "Pipette Calibration" : "Pipette calibration")
+                    .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                    AppSubtitleText(stageSubtitle)
-                }
-
-                CalibrationStepRail(currentStep: stage.stepNumber)
+                CalibrationStepRail(currentStep: displayStage.stepNumber)
 
                 stageCard
 
@@ -77,6 +79,8 @@ struct PipetteCalibrationSetupView: View {
 
             Spacer(minLength: 0)
 
+            simulatorTestMenu
+
             if isSettingsMode == false {
                 SetupProgressIndicator(currentStep: 4, totalSteps: 4)
             }
@@ -87,25 +91,23 @@ struct PipetteCalibrationSetupView: View {
     private var stageCard: some View {
         VStack(alignment: .leading, spacing: 24) {
             VStack(alignment: .leading, spacing: 10) {
-                Text(stage.title)
+                Text(displayStage.title)
                     .font(.title3.weight(.bold))
                     .foregroundStyle(AppUIStyle.primaryTextColor)
 
-                Text(stage.instruction)
-                    .font(.system(size: 18, weight: .regular, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .fixedSize(horizontal: false, vertical: true)
+                calibrationProgressGroup
             }
 
             Divider()
                 .overlay(Color.white.opacity(0.12))
 
-            HStack(alignment: .center, spacing: 18) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(displayStage.instruction)
+                    .font(.system(size: 18, weight: .regular, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+
                 stageControls
-
-                Spacer(minLength: 8)
-
-                calibrationProgressGroup
             }
         }
         .padding(24)
@@ -114,12 +116,13 @@ struct PipetteCalibrationSetupView: View {
 
     @ViewBuilder
     private var stageControls: some View {
-        switch stage {
+        switch displayStage {
         case .chooseHand:
             HStack(spacing: 12) {
                 handSelectionButton(.left)
                 handSelectionButton(.right)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
 
         case .restPose:
             HStack(spacing: 12) {
@@ -130,8 +133,12 @@ struct PipetteCalibrationSetupView: View {
                 Button("Change Hand") {
                     appModel.setPipetteHandedness(nil)
                 }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
             }
+            .frame(maxWidth: .infinity, alignment: .center)
 
         case .pressedPose:
             HStack(spacing: 12) {
@@ -142,10 +149,14 @@ struct PipetteCalibrationSetupView: View {
                 Button("Recapture Rest") {
                     appModel.startRestCalibrationCapture()
                 }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
                 .disabled(!canCapture)
                 .opacity(canCapture ? 1 : 0.45)
             }
+            .frame(maxWidth: .infinity, alignment: .center)
 
         case .ready:
             HStack(spacing: 12) {
@@ -160,26 +171,40 @@ struct PipetteCalibrationSetupView: View {
                         appModel.beginWorkflow()
                     }
                 }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .buttonStyle(PrimaryActionButton())
 
                 Button("Recalibrate") {
                     appModel.resetPipetteCalibration()
                 }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
             }
+            .frame(maxWidth: .infinity, alignment: .center)
 
         case .failed:
             HStack(spacing: 12) {
                 Button("Try Again") {
                     appModel.resetPipetteCalibration()
                 }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .buttonStyle(PrimaryActionButton())
 
                 Button("Change Hand") {
                     appModel.setPipetteHandedness(nil)
                 }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 
@@ -203,7 +228,7 @@ struct PipetteCalibrationSetupView: View {
     }
 
     private var calibrationProgressGroup: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             CalibrationProgressBadge(
                 title: "Rest",
                 value: restProgressPercentageLabel,
@@ -217,6 +242,7 @@ struct PipetteCalibrationSetupView: View {
                 detail: pressProgressCountLabel
             )
         }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 
     @ViewBuilder
@@ -226,7 +252,7 @@ struct PipetteCalibrationSetupView: View {
                 Label("Mixed Reality View open", systemImage: "visionpro")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(Color.white.opacity(0.58))
-            } else if stage != .ready {
+            } else if displayStage != .ready {
                 mixedRealityControl
             }
 
@@ -238,25 +264,12 @@ struct PipetteCalibrationSetupView: View {
 
     @ViewBuilder
     private var footerSecondaryAction: some View {
-        if stage == .ready {
+        if displayStage == .ready {
             Button("Recalibrate") {
                 appModel.resetPipetteCalibration()
             }
             .buttonStyle(SecondaryActionButton())
-        } else if isSettingsMode == false {
-            Button("Skip Calibration") {
-                appModel.beginWorkflow()
-            }
-            .buttonStyle(SecondaryActionButton())
         }
-    }
-
-    private var stageSubtitle: String {
-        if let selectedHand = appModel.selectedPipetteHand {
-            return "Calibrating for \(selectedHand.title.lowercased()) hand."
-        }
-
-        return stage.subtitle
     }
 
     private var isRestCaptureComplete: Bool {
@@ -303,21 +316,51 @@ struct PipetteCalibrationSetupView: View {
 
     @ViewBuilder
     private func captureOrOpenButton(title: String, action: @escaping () -> Void) -> some View {
-        if appModel.immersiveSpaceState == .open {
-            Button(title, action: action)
-                .buttonStyle(PrimaryActionButton())
-                .disabled(!canCapture)
-                .opacity(canCapture ? 1 : 0.45)
-        } else {
-            Button {
-                Task { @MainActor in
-                    await openMixedRealityIfNeeded()
+        Button(title, action: action)
+            .frame(width: calibrationActionWidth)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .buttonStyle(PrimaryActionButton())
+            .disabled(!canCapture)
+            .opacity(canCapture ? 1 : 0.45)
+    }
+
+    @ViewBuilder
+    private var simulatorTestMenu: some View {
+#if DEBUG
+        HStack(spacing: 10) {
+            Menu {
+                Button("Live State") {
+                    simulatorStageOverride = nil
+                }
+                Button("Step 1: Choose Hand") {
+                    simulatorStageOverride = .chooseHand
+                }
+                Button("Step 2: Rest Position") {
+                    simulatorStageOverride = .restPose
+                }
+                Button("Step 3: Pressed Position") {
+                    simulatorStageOverride = .pressedPose
+                }
+                Button("Step 4: Ready") {
+                    simulatorStageOverride = .ready
+                }
+                Button("Failed State") {
+                    simulatorStageOverride = .failed
                 }
             } label: {
-                Label("Open Mixed Reality View", systemImage: "visionpro")
+                Label("Test", systemImage: "sparkles")
             }
-            .buttonStyle(PrimaryActionButton())
+            .buttonStyle(SecondaryActionButton())
+
+            if isSettingsMode == false && displayStage != .ready {
+                Button("Skip Calibration") {
+                    appModel.beginWorkflow()
+                }
+                .buttonStyle(SecondaryActionButton())
+            }
         }
+#endif
     }
 
     @ViewBuilder
@@ -326,11 +369,17 @@ struct PipetteCalibrationSetupView: View {
             Button(hand.title) {
                 appModel.setPipetteHandedness(hand)
             }
+            .frame(width: calibrationActionWidth)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .buttonStyle(PrimaryActionButton())
         } else {
             Button(hand.title) {
                 appModel.setPipetteHandedness(hand)
             }
+            .frame(width: calibrationActionWidth)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
             .buttonStyle(SecondaryActionButton())
         }
     }
@@ -469,32 +518,33 @@ private struct CalibrationProgressBadge: View {
             ZStack {
                 Circle()
                     .stroke(Color.white.opacity(0.16), lineWidth: 3)
-                    .frame(width: 28, height: 28)
+                    .frame(width: 32, height: 32)
 
                 if isComplete {
                     Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
+                        .font(.subheadline.weight(.bold))
                         .foregroundStyle(AppUIStyle.accentColor)
                 } else {
                     Circle()
                         .trim(from: 0, to: progress)
                         .stroke(AppUIStyle.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .frame(width: 28, height: 28)
+                        .frame(width: 32, height: 32)
                         .rotationEffect(.degrees(-90))
                 }
             }
 
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundStyle(Color.white.opacity(0.64))
 
             Text(isComplete ? "Ready" : value)
-                .font(.subheadline.weight(.bold))
+                .font(.headline.weight(.bold))
                 .foregroundStyle(AppUIStyle.primaryTextColor)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .frame(minWidth: 150, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 13)
         .background(Capsule().fill(Color.white.opacity(0.07)))
         .background(Capsule().fill(.regularMaterial))
         .overlay(

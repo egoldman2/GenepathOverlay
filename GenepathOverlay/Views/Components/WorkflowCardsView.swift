@@ -59,21 +59,24 @@ private struct ValidationStatusView: View {
     @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .center, spacing: 8) {
             Text(appModel.uiState.validationFeedback.title)
                 .font(.headline)
+                .multilineTextAlignment(.center)
 
             Text(appModel.uiState.validationFeedback.detail)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
             if let errorMessage = appModel.uiState.errorMessage {
                 Text(errorMessage)
                     .font(.subheadline)
                     .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding(12)
         .background(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -86,32 +89,29 @@ private struct CompactRunStatusView: View {
     @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        HStack(alignment: .center, spacing: 14) {
-            VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .center, spacing: 12) {
+            Text(appModel.isAwaitingTipChange ? "Tip Change" : appModel.currentPhase.title)
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 13)
+                .background(TrackingGlassBackground(cornerRadius: 24))
+
+            VStack(alignment: .center, spacing: 5) {
                 Text(statusTitle)
-                    .font(.headline.weight(.semibold))
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .foregroundStyle(AppUIStyle.primaryTextColor)
+                    .multilineTextAlignment(.center)
 
                 Text(statusText)
-                    .font(.subheadline)
+                    .font(.system(size: 17, weight: .regular, design: .rounded))
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
             }
-
-            Spacer(minLength: 0)
-
-            Text(appModel.isAwaitingTipChange ? "Tip Change" : appModel.currentPhase.title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 7)
-                .background(
-                    Capsule()
-                        .fill(Color.white.opacity(0.08))
-                )
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(TrackingGlassBackground(cornerRadius: 18))
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.vertical, 6)
     }
 
     private var statusTitle: String {
@@ -141,6 +141,8 @@ private struct CompactRunStatusView: View {
 
 private struct WorkflowActionRow: View {
     @Environment(AppModel.self) private var appModel
+    private let actionButtonWidth: CGFloat = 176
+    private let actionButtonFont = Font.system(size: 15, weight: .semibold, design: .rounded)
 
     var body: some View {
         if appModel.currentStep != nil {
@@ -172,6 +174,11 @@ private struct WorkflowActionRow: View {
                 Button("Fresh Tip Attached") {
                     appModel.confirmTipReplacement()
                 }
+                .font(actionButtonFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: actionButtonWidth)
+                .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(PrimaryActionButton())
             }
         } else {
@@ -182,60 +189,114 @@ private struct WorkflowActionRow: View {
                     Button("Preview Correct") {
                         appModel.validateCurrentPhase()
                     }
+                    .font(actionButtonFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(width: actionButtonWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                     .buttonStyle(PrimaryActionButton())
 
                     Button("Preview Wrong") {
                         appModel.validateCurrentPhase(simulatingMismatch: true)
                     }
+                    .font(actionButtonFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(width: actionButtonWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                     .buttonStyle(SecondaryActionButton())
 
                     Button("Manual Confirm") {
                         appModel.confirmCurrentPhaseManually()
                     }
+                    .font(actionButtonFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(width: actionButtonWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                     .buttonStyle(SecondaryActionButton())
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 HStack(spacing: 12) {
                     Button("Check Position") {
                         appModel.validateCurrentPhase()
                     }
+                    .font(actionButtonFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(width: actionButtonWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                     .buttonStyle(PrimaryActionButton())
 
                     Button(appModel.manualConfirmButtonTitle) {
                         appModel.confirmCurrentPhaseManually()
                     }
+                    .font(actionButtonFont)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .frame(width: actionButtonWidth)
+                    .fixedSize(horizontal: true, vertical: false)
                     .buttonStyle(SecondaryActionButton())
                 }
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         case .some(.correct):
             Button(appModel.currentPhase.confirmationTitle) {
                 appModel.confirmValidationAndAdvance()
             }
+            .font(actionButtonFont)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .frame(width: actionButtonWidth)
+            .fixedSize(horizontal: true, vertical: false)
             .buttonStyle(PrimaryActionButton())
         case .some(.incorrect):
             HStack(spacing: 12) {
                 Button("Retry") {
                     appModel.retryValidation()
                 }
+                .font(actionButtonFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: actionButtonWidth)
+                .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(SecondaryActionButton())
 
                 Button("Continue Anyway") {
                     appModel.continueAnyway()
                 }
+                .font(actionButtonFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: actionButtonWidth)
+                .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(PrimaryActionButton())
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         case .some(.blocked):
             HStack(spacing: 12) {
                 Button("Try Again") {
                     appModel.retryValidation()
                 }
+                .font(actionButtonFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: actionButtonWidth)
+                .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(SecondaryActionButton())
 
                 Button(appModel.manualConfirmButtonTitle) {
                     appModel.confirmCurrentPhaseManually()
                 }
+                .font(actionButtonFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: actionButtonWidth)
+                .fixedSize(horizontal: true, vertical: false)
                 .buttonStyle(PrimaryActionButton())
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         }
     }

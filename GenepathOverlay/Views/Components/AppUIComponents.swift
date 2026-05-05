@@ -214,6 +214,31 @@ struct CompactIconButtonStyle: ButtonStyle {
     }
 }
 
+struct ToolTrayIconButtonStyle: ButtonStyle {
+    private let shape = Circle()
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.white)
+            .frame(width: 42, height: 42)
+            .contentShape([.interaction, .hoverEffect], shape)
+            .background(
+                shape
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.09 : 0.06))
+                    .background(
+                        shape
+                            .fill(.regularMaterial)
+                    )
+            )
+            .overlay(
+                shape
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
+            .opacity(configuration.isPressed ? 0.82 : 0.92)
+            .hoverEffect(.lift)
+    }
+}
+
 struct StepPillButtonStyle: ButtonStyle {
     private let shape = Capsule()
 
