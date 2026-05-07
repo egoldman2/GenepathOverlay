@@ -47,6 +47,9 @@ class AppModel {
     var trackingSnapshot = TrackingSnapshot.idle
     var currentScreen: Screen = .home
     var pipetteCalibrationOpenedFromSettings = false
+    var isMainWindowOpen = false
+    var isClosingAuxiliaryWindowsFromMainWindow = false
+    var isWorkflowScreenVisible = false
     var isStepQueueWindowOpen = false
     var isWorkflowSettingsWindowOpen = false
     var isShowingTestWellPlate = false {
@@ -343,6 +346,22 @@ class AppModel {
 
     func setStepQueueWindowOpen(_ isOpen: Bool) {
         isStepQueueWindowOpen = isOpen
+    }
+
+    func setMainWindowOpen(_ isOpen: Bool) {
+        isMainWindowOpen = isOpen
+
+        if isOpen {
+            isClosingAuxiliaryWindowsFromMainWindow = false
+        }
+    }
+
+    func setClosingAuxiliaryWindowsFromMainWindow(_ isClosing: Bool) {
+        isClosingAuxiliaryWindowsFromMainWindow = isClosing
+    }
+
+    func setWorkflowScreenVisible(_ isVisible: Bool) {
+        isWorkflowScreenVisible = isVisible
     }
 
     func setWorkflowSettingsWindowOpen(_ isOpen: Bool) {
