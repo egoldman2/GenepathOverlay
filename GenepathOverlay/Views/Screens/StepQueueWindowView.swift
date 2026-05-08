@@ -2,6 +2,8 @@ import SwiftUI
 
 struct StepQueueWindowView: View {
     @Environment(AppModel.self) private var appModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openWindow) private var openWindow
 
     private var currentStepID: UUID? {
         appModel.currentStep?.id
@@ -34,10 +36,38 @@ struct StepQueueWindowView: View {
                 .background(StepQueueGlassBackground())
             }
             .padding(26)
-            .frame(maxWidth: 340, alignment: .leading)
+            .frame(maxWidth: 430, alignment: .leading)
         }
         .foregroundStyle(AppUIStyle.primaryTextColor)
         .preferredColorScheme(.dark)
+        .task {
+            guard appModel.isWorkflowScreenVisible == false || appModel.isMainWindowOpen == false else { return }
+            await closeQueueAndRestoreMainWindowIfNeeded()
+        }
+        .onChange(of: appModel.isMainWindowOpen) { _, isOpen in
+            guard isOpen == false else { return }
+            Task {
+                await closeQueueAndRestoreMainWindowIfNeeded()
+            }
+        }
+        .onChange(of: appModel.isWorkflowScreenVisible) { _, isVisible in
+            guard isVisible == false else { return }
+            Task {
+                await closeQueueAndRestoreMainWindowIfNeeded()
+            }
+        }
+    }
+
+    private func closeQueueAndRestoreMainWindowIfNeeded() async {
+        await Task.yield()
+
+        if appModel.isMainWindowOpen == false,
+           appModel.isClosingAuxiliaryWindowsFromMainWindow == false {
+            openWindow(id: "main-window")
+        }
+
+        appModel.setStepQueueWindowOpen(false)
+        dismiss()
     }
 }
 
@@ -68,6 +98,9 @@ private struct StepQueueRowView: View {
             Text(AppUIStyle.formattedVolume(step.volume))
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .frame(width: 52, alignment: .trailing)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)

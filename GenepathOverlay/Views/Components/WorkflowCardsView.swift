@@ -15,11 +15,11 @@ struct GuidedTransferHeroView: View {
 
             CompactRunStatusView()
 
+            WorkflowActionRow()
+
             if shouldShowValidationStatus {
                 ValidationStatusView()
             }
-
-            WorkflowActionRow()
         }
         .padding(14)
     }
@@ -141,7 +141,8 @@ private struct CompactRunStatusView: View {
 
 private struct WorkflowActionRow: View {
     @Environment(AppModel.self) private var appModel
-    private let actionButtonWidth: CGFloat = 176
+    private let actionButtonWidth: CGFloat = 188
+    private let actionButtonHeight: CGFloat = 52
     private let actionButtonFont = Font.system(size: 15, weight: .semibold, design: .rounded)
 
     var body: some View {
@@ -174,11 +175,7 @@ private struct WorkflowActionRow: View {
                 Button("Fresh Tip Attached") {
                     appModel.confirmTipReplacement()
                 }
-                .font(actionButtonFont)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: actionButtonWidth)
-                .fixedSize(horizontal: true, vertical: false)
+                .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                 .buttonStyle(PrimaryActionButton())
             }
         } else {
@@ -189,31 +186,19 @@ private struct WorkflowActionRow: View {
                     Button("Preview Correct") {
                         appModel.validateCurrentPhase()
                     }
-                    .font(actionButtonFont)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(width: actionButtonWidth)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                     .buttonStyle(PrimaryActionButton())
 
                     Button("Preview Wrong") {
                         appModel.validateCurrentPhase(simulatingMismatch: true)
                     }
-                    .font(actionButtonFont)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(width: actionButtonWidth)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                     .buttonStyle(SecondaryActionButton())
 
                     Button("Manual Confirm") {
                         appModel.confirmCurrentPhaseManually()
                     }
-                    .font(actionButtonFont)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(width: actionButtonWidth)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                     .buttonStyle(SecondaryActionButton())
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -222,21 +207,13 @@ private struct WorkflowActionRow: View {
                     Button("Check Position") {
                         appModel.validateCurrentPhase()
                     }
-                    .font(actionButtonFont)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(width: actionButtonWidth)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                     .buttonStyle(PrimaryActionButton())
 
                     Button(appModel.manualConfirmButtonTitle) {
                         appModel.confirmCurrentPhaseManually()
                     }
-                    .font(actionButtonFont)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
-                    .frame(width: actionButtonWidth)
-                    .fixedSize(horizontal: true, vertical: false)
+                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                     .buttonStyle(SecondaryActionButton())
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -245,32 +222,20 @@ private struct WorkflowActionRow: View {
             Button(appModel.currentPhase.confirmationTitle) {
                 appModel.confirmValidationAndAdvance()
             }
-            .font(actionButtonFont)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .frame(width: actionButtonWidth)
-            .fixedSize(horizontal: true, vertical: false)
+            .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
             .buttonStyle(PrimaryActionButton())
         case .some(.incorrect):
             HStack(spacing: 12) {
                 Button("Retry") {
                     appModel.retryValidation()
                 }
-                .font(actionButtonFont)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: actionButtonWidth)
-                .fixedSize(horizontal: true, vertical: false)
+                .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                 .buttonStyle(SecondaryActionButton())
 
                 Button("Continue Anyway") {
                     appModel.continueAnyway()
                 }
-                .font(actionButtonFont)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: actionButtonWidth)
-                .fixedSize(horizontal: true, vertical: false)
+                .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                 .buttonStyle(PrimaryActionButton())
             }
             .frame(maxWidth: .infinity, alignment: .center)
@@ -279,26 +244,33 @@ private struct WorkflowActionRow: View {
                 Button("Try Again") {
                     appModel.retryValidation()
                 }
-                .font(actionButtonFont)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: actionButtonWidth)
-                .fixedSize(horizontal: true, vertical: false)
+                .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                 .buttonStyle(SecondaryActionButton())
 
                 Button(appModel.manualConfirmButtonTitle) {
                     appModel.confirmCurrentPhaseManually()
                 }
-                .font(actionButtonFont)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: actionButtonWidth)
-                .fixedSize(horizontal: true, vertical: false)
+                .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                 .buttonStyle(PrimaryActionButton())
             }
             .frame(maxWidth: .infinity, alignment: .center)
         }
         }
+    }
+}
+
+private struct WorkflowActionButtonLayout: ViewModifier {
+    let width: CGFloat
+    let height: CGFloat
+    let font: Font
+
+    func body(content: Content) -> some View {
+        content
+            .font(font)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .multilineTextAlignment(.center)
+            .frame(width: width, height: height, alignment: .center)
     }
 }
 

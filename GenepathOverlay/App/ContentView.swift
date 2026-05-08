@@ -49,9 +49,6 @@ struct ContentView: View {
         .foregroundStyle(AppUIStyle.primaryTextColor)
         .preferredColorScheme(.dark)
         .defaultHoverEffect(.lift)
-        .task {
-            appModel.prepareForLaunch()
-        }
         .fileImporter(
             isPresented: Binding(
                 get: { appModel.uiState.isShowingImporter },

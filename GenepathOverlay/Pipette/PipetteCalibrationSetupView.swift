@@ -264,12 +264,7 @@ struct PipetteCalibrationSetupView: View {
 
     @ViewBuilder
     private var footerSecondaryAction: some View {
-        if displayStage == .ready {
-            Button("Recalibrate") {
-                appModel.resetPipetteCalibration()
-            }
-            .buttonStyle(SecondaryActionButton())
-        }
+        
     }
 
     private var isRestCaptureComplete: Bool {

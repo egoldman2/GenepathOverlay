@@ -46,6 +46,12 @@ struct ActiveWorkflowView: View {
         .padding(.top, 18)
         .padding(.bottom, 24)
         .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
+        .onAppear {
+            appModel.setWorkflowScreenVisible(true)
+        }
+        .onDisappear {
+            appModel.setWorkflowScreenVisible(false)
+        }
     }
 
     private var topBar: some View {
