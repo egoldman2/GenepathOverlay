@@ -33,6 +33,8 @@ struct Step: Identifiable, Sendable, Equatable {
     let source: Coordinate
     let destination: Coordinate
     let volume: Double
+    var volumeConfirmedAt: Date?
+    var volumeConfirmedValue: Double?
     var hasWarning: Bool
     var dispenseWarning: Bool
 
@@ -41,6 +43,8 @@ struct Step: Identifiable, Sendable, Equatable {
         source: Coordinate,
         destination: Coordinate,
         volume: Double,
+        volumeConfirmedAt: Date? = nil,
+        volumeConfirmedValue: Double? = nil,
         hasWarning: Bool = false,
         dispenseWarning: Bool = false
     ) {
@@ -49,8 +53,14 @@ struct Step: Identifiable, Sendable, Equatable {
         self.source = source
         self.destination = destination
         self.volume = volume
+        self.volumeConfirmedAt = volumeConfirmedAt
+        self.volumeConfirmedValue = volumeConfirmedValue
         self.hasWarning = hasWarning
         self.dispenseWarning = dispenseWarning
+    }
+
+    var isVolumeConfirmed: Bool {
+        volumeConfirmedAt != nil
     }
 
     func coordinate(for phase: WorkflowPhase) -> Coordinate {
@@ -60,6 +70,22 @@ struct Step: Identifiable, Sendable, Equatable {
         case .dispense:
             return destination
         }
+    }
+}
+
+struct VolumeVerificationState: Sendable, Equatable {
+    let targetVolume: Double
+    let confirmedValue: Double?
+    let confirmedAt: Date?
+
+    var isConfirmed: Bool {
+        confirmedAt != nil
+    }
+
+    init(step: Step) {
+        targetVolume = step.volume
+        confirmedValue = step.volumeConfirmedValue
+        confirmedAt = step.volumeConfirmedAt
     }
 }
 
@@ -211,7 +237,7 @@ struct PipetteCalibrationState: Sendable, Equatable {
         case .collectingPress:
             return "Capturing pressed thumb pose (\(pressedSampleCount)/\(requiredSampleCount))."
         case .complete:
-            return "Calibration complete. Live tip tracking uses the grip pose and fixed 25 cm pipette length."
+            return "Calibration complete. Live tip tracking uses the grip pose and visible fingertip shaft."
         case .failed:
             return errorMessage ?? "Calibration failed. Reset and try again."
         }
@@ -324,6 +350,7 @@ enum AppState {
     case idle
     case loadingCSV
     case mapping
+    case verifyingVolume(Step, VolumeVerificationState)
     case runningStep(Step)
     case awaitingTipChange(Step, TipChangeState)
     case validatingAspiration
@@ -338,6 +365,8 @@ enum AppState {
             return "Loading CSV"
         case .mapping:
             return "Mapping Coordinates"
+        case .verifyingVolume(let step, _):
+            return "Verifying Volume for Step \(step.sequenceNumber)"
         case .runningStep(let step):
             return "Running Step \(step.sequenceNumber)"
         case .awaitingTipChange(let step, let tipChangeState):
@@ -354,6 +383,7 @@ enum AppState {
 
 struct WorkflowSummary: Sendable {
     let totalSteps: Int
+    let volumeConfirmations: Int
     let aspirationWarnings: Int
     let dispenseWarnings: Int
     let completedAt: Date

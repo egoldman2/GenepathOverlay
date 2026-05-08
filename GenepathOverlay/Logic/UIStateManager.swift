@@ -41,6 +41,16 @@ struct UIStateManager {
         )
     }
 
+    mutating func setAwaitingVolumeVerification(step: Step, state: VolumeVerificationState) {
+        appState = .verifyingVolume(step, state)
+        validationResult = nil
+        validationFeedback = ValidationFeedback(
+            tone: .neutral,
+            title: "Verify Dispense Amount",
+            detail: "Set the pipette volume before starting Step \(step.sequenceNumber)."
+        )
+    }
+
     mutating func setRunning(step: Step, phase: WorkflowPhase) {
         appState = .runningStep(step)
         validationResult = nil

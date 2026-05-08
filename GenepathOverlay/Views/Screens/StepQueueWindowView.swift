@@ -23,7 +23,8 @@ struct StepQueueWindowView: View {
                     ForEach(appModel.sequenceEngine.allSteps) { step in
                         StepQueueRowView(
                             step: step,
-                            isCurrent: step.id == currentStepID
+                            isCurrent: step.id == currentStepID,
+                            currentStage: currentStage(for: step)
                         )
 
                         if step.id != lastStepID {
@@ -58,6 +59,20 @@ struct StepQueueWindowView: View {
         }
     }
 
+    private func currentStage(for step: Step) -> String? {
+        guard step.id == currentStepID else { return nil }
+
+        if appModel.isAwaitingVolumeVerification {
+            return "Volume"
+        }
+
+        if appModel.isAwaitingTipChange {
+            return "Tip"
+        }
+
+        return appModel.currentPhase.title
+    }
+
     private func closeQueueAndRestoreMainWindowIfNeeded() async {
         await Task.yield()
 
@@ -74,6 +89,7 @@ struct StepQueueWindowView: View {
 private struct StepQueueRowView: View {
     let step: Step
     let isCurrent: Bool
+    let currentStage: String?
 
     var body: some View {
         HStack(spacing: 14) {
@@ -94,6 +110,17 @@ private struct StepQueueRowView: View {
                 .foregroundStyle(AppUIStyle.primaryTextColor)
 
             Spacer(minLength: 0)
+
+            if let currentStage {
+                Text(currentStage)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppUIStyle.accentColor)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(AppUIStyle.accentColor.opacity(0.14), in: Capsule())
+            }
 
             Text(AppUIStyle.formattedVolume(step.volume))
                 .font(.caption.weight(.semibold))

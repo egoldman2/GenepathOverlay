@@ -62,7 +62,7 @@ struct PipetteTipEstimator: Sendable {
     private(set) var profile: PipetteTipEstimatorProfile?
     private var smoothedTipSamples: [SIMD3<Float>] = []
 
-    init(smoothingSampleCount: Int = 12) {
+    init(smoothingSampleCount: Int = 4) {
         self.smoothingSampleCount = smoothingSampleCount
     }
 
@@ -80,7 +80,7 @@ struct PipetteTipEstimator: Sendable {
         guard let profile else { return nil }
 
         let gripWorldPosition = handPose.worldPosition(forAnchorPosition: handPose.gripReferencePosition)
-        let anchorTipDirection = handPose.tipDirectionInHandSpace ?? profile.tipDirectionInHandSpace
+        let anchorTipDirection = blendedTipDirection(for: handPose, profile: profile)
         let tipDirection = handPose.worldDirection(forAnchorDirection: anchorTipDirection)
         let rawTipPosition = gripWorldPosition + normalized(tipDirection) * profile.tipLength
 
@@ -97,6 +97,22 @@ struct PipetteTipEstimator: Sendable {
         let lengthSquared = simd_length_squared(vector)
         guard lengthSquared > 0.000001 else { return SIMD3<Float>(0, -1, 0) }
         return vector / sqrt(lengthSquared)
+    }
+
+    private func blendedTipDirection(
+        for handPose: PipetteHandPose,
+        profile: PipetteTipEstimatorProfile
+    ) -> SIMD3<Float> {
+        guard var liveDirection = handPose.tipDirectionInHandSpace else {
+            return profile.tipDirectionInHandSpace
+        }
+
+        let calibratedDirection = profile.tipDirectionInHandSpace
+        if simd_dot(liveDirection, calibratedDirection) < 0 {
+            liveDirection = -liveDirection
+        }
+
+        return normalized(calibratedDirection * 0.75 + liveDirection * 0.25)
     }
 }
 

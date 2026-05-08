@@ -39,7 +39,7 @@ struct PipetteCalibrationProfile: Sendable, Equatable {
     static func build(
         restSamples: [SIMD3<Float>],
         pressedSamples: [SIMD3<Float>],
-        minimumTravel: Float = 0.004
+        minimumTravel: Float = 0.003
     ) -> PipetteCalibrationProfile? {
         guard !restSamples.isEmpty, !pressedSamples.isEmpty else {
             return nil
@@ -65,9 +65,9 @@ struct PipetteCalibrationProfile: Sendable, Equatable {
             restThumbPosition: rest,
             pressedThumbPosition: pressed,
             pressDirection: direction,
-            pressThreshold: travelMagnitude * 0.75,
-            releaseThreshold: travelMagnitude * 0.30,
-            maxLateralError: max(0.006, min(0.014, lateralEnvelope * 2.5 + travelMagnitude * 0.25))
+            pressThreshold: travelMagnitude * 0.55,
+            releaseThreshold: travelMagnitude * 0.25,
+            maxLateralError: max(0.012, min(0.026, lateralEnvelope * 3.5 + travelMagnitude * 0.45))
         )
     }
 
@@ -108,9 +108,9 @@ struct PipettePressClassifier {
     private var belowThresholdCount = 0
 
     init(
-        smoothingSampleCount: Int = 5,
-        consecutiveSamplesRequired: Int = 3,
-        minimumGripConfidence: Float = 0.55
+        smoothingSampleCount: Int = 3,
+        consecutiveSamplesRequired: Int = 2,
+        minimumGripConfidence: Float = 0.25
     ) {
         self.smoothingSampleCount = smoothingSampleCount
         self.consecutiveSamplesRequired = consecutiveSamplesRequired
@@ -164,7 +164,7 @@ struct PipettePressClassifier {
             return clearSignal(at: timestamp)
         }
 
-        if let lateralError, lateralError > calibration.maxLateralError {
+        if let lateralError, lateralError > calibration.maxLateralError, output.isPressed == false {
             smoothedTravelSamples.removeAll()
             aboveThresholdCount = 0
             belowThresholdCount = 0

@@ -15,6 +15,20 @@ struct SequenceEngine {
         return stepsQueue[currentIndex]
     }
 
+    var currentVolumeVerificationState: VolumeVerificationState? {
+        currentStep.map(VolumeVerificationState.init(step:))
+    }
+
+    var requiresVolumeVerification: Bool {
+        guard let currentStep,
+              currentPhase == .aspiration,
+              isAwaitingTipChange == false else {
+            return false
+        }
+
+        return currentStep.isVolumeConfirmed == false
+    }
+
     var totalSteps: Int {
         stepsQueue.count
     }
@@ -39,6 +53,8 @@ struct SequenceEngine {
 
     mutating func restartCurrentRun() {
         for index in stepsQueue.indices {
+            stepsQueue[index].volumeConfirmedAt = nil
+            stepsQueue[index].volumeConfirmedValue = nil
             stepsQueue[index].hasWarning = false
             stepsQueue[index].dispenseWarning = false
         }
@@ -58,9 +74,22 @@ struct SequenceEngine {
         }
     }
 
+    mutating func confirmVolumeForCurrentStep(value: Double? = nil, at confirmedAt: Date = Date()) -> Bool {
+        guard stepsQueue.indices.contains(currentIndex),
+              currentPhase == .aspiration,
+              isAwaitingTipChange == false else {
+            return false
+        }
+
+        stepsQueue[currentIndex].volumeConfirmedValue = value ?? stepsQueue[currentIndex].volume
+        stepsQueue[currentIndex].volumeConfirmedAt = confirmedAt
+        return true
+    }
+
     mutating func advance() -> Step? {
         guard stepsQueue.indices.contains(currentIndex),
-              isAwaitingTipChange == false else {
+              isAwaitingTipChange == false,
+              requiresVolumeVerification == false else {
             return currentStep
         }
 
@@ -88,6 +117,7 @@ struct SequenceEngine {
     func summary() -> WorkflowSummary {
         WorkflowSummary(
             totalSteps: stepsQueue.count,
+            volumeConfirmations: stepsQueue.filter(\.isVolumeConfirmed).count,
             aspirationWarnings: stepsQueue.filter(\.hasWarning).count,
             dispenseWarnings: stepsQueue.filter(\.dispenseWarning).count,
             completedAt: Date()

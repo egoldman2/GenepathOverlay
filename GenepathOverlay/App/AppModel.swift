@@ -88,13 +88,22 @@ class AppModel {
         sequenceEngine.isAwaitingTipChange
     }
 
+    var isAwaitingVolumeVerification: Bool {
+        sequenceEngine.requiresVolumeVerification
+    }
+
+    var currentVolumeVerificationState: VolumeVerificationState? {
+        sequenceEngine.currentVolumeVerificationState
+    }
+
     var tipChangeState: TipChangeState? {
         sequenceEngine.tipChangeState
     }
 
     var overlayHighlightedCoordinates: [PlateID: Coordinate] {
         guard let currentStep,
-              isAwaitingTipChange == false else {
+              isAwaitingTipChange == false,
+              isAwaitingVolumeVerification == false else {
             return [:]
         }
         let targetCoordinate = currentStep.coordinate(for: currentPhase)
@@ -114,6 +123,10 @@ class AppModel {
             return tipChangeInstructionTitle
         }
 
+        if isAwaitingVolumeVerification {
+            return volumeVerificationInstructionTitle
+        }
+
         guard let currentStep else {
             return "Import a CSV to begin"
         }
@@ -125,6 +138,10 @@ class AppModel {
     var currentInstructionDetail: String {
         if isAwaitingTipChange {
             return tipChangeInstructionDetail
+        }
+
+        if isAwaitingVolumeVerification {
+            return volumeVerificationInstructionDetail
         }
 
         guard let currentStep else {
@@ -277,6 +294,27 @@ class AppModel {
         case .none:
             return "Remove the used tip, attach a fresh tip, then continue to aspirate \(formattedVolume(currentStep.volume)) from source \(currentStep.source.well)."
         }
+    }
+
+    var volumeVerificationInstructionTitle: String {
+        guard let currentStep else {
+            return "Verify Dispense Amount"
+        }
+
+        return "Set \(formattedVolume(currentStep.volume))"
+    }
+
+    var volumeVerificationInstructionDetail: String {
+        guard let currentStep else {
+            return "Set the pipette volume before starting the transfer."
+        }
+
+        return "Adjust the pipette dial to \(formattedVolume(currentStep.volume)) before aspirating from source \(currentStep.source.well)."
+    }
+
+    var volumeVerificationTargetLabel: String {
+        guard let currentStep else { return "-- uL" }
+        return formattedVolume(currentStep.volume)
     }
 
     var previewSteps: [Step] {
@@ -435,6 +473,19 @@ class AppModel {
             return result
         }
 
+        guard isAwaitingVolumeVerification == false else {
+            let result = ValidationResult.blocked("The pipette volume must be confirmed before starting this transfer step.")
+            uiState.setValidationResult(
+                result,
+                feedback: ValidationFeedback(
+                    tone: .warning,
+                    title: "Volume Not Confirmed",
+                    detail: volumeVerificationInstructionDetail
+                )
+            )
+            return result
+        }
+
         guard let currentStep else { return nil }
 
         uiState.setValidating(currentPhase)
@@ -478,9 +529,25 @@ class AppModel {
         updateWorkflowPresentation()
     }
 
+    func confirmCurrentStepVolume() {
+        guard sequenceEngine.confirmVolumeForCurrentStep() else { return }
+
+        trackingManager.clearDetection()
+        syncTrackingSnapshot()
+        updateWorkflowPresentation()
+    }
+
     func confirmCurrentPhaseManually() {
         guard currentStep != nil,
               isAwaitingTipChange == false else {
+            return
+        }
+
+        guard isAwaitingVolumeVerification == false else {
+            blockCurrentAction(
+                title: "Volume Not Confirmed",
+                detail: "Confirm the pipette volume before validating the aspiration target."
+            )
             return
         }
 
@@ -547,6 +614,13 @@ class AppModel {
             return
         }
 
+        if let currentStep,
+           sequenceEngine.requiresVolumeVerification,
+           let volumeState = sequenceEngine.currentVolumeVerificationState {
+            uiState.setAwaitingVolumeVerification(step: currentStep, state: volumeState)
+            return
+        }
+
         if let currentStep {
             uiState.setRunning(step: currentStep, phase: currentPhase)
             return
@@ -591,6 +665,14 @@ class AppModel {
         }
 
         guard isAwaitingTipChange == false else { return }
+
+        guard isAwaitingVolumeVerification == false else {
+            blockCurrentAction(
+                title: "Volume Not Confirmed",
+                detail: "Confirm the pipette volume before pressing the pipette for aspiration."
+            )
+            return
+        }
 
         handleAutoWorkflowPipettePress()
     }
@@ -659,6 +741,7 @@ class AppModel {
             "GenepathOverlay Session Log",
             "Completed: \(summary.completedAt.formatted(date: .abbreviated, time: .shortened))",
             "Total steps: \(summary.totalSteps)",
+            "Volume confirmations: \(summary.volumeConfirmations)",
             "Aspiration warnings: \(summary.aspirationWarnings)",
             "Dispense warnings: \(summary.dispenseWarnings)",
             "Pipette hand: \(selectedPipetteHandLabel)",
@@ -668,12 +751,25 @@ class AppModel {
         ]
 
         for step in sequenceEngine.allSteps {
+            let confirmedValue = step.volumeConfirmedValue.map(formattedVolume) ?? "none"
+            let confirmedAt = step.volumeConfirmedAt?.formatted(date: .abbreviated, time: .shortened) ?? "not confirmed"
             lines.append(
-                "Step \(step.sequenceNumber),source=\(step.source.well),destination=\(step.destination.well),volume=\(formattedVolume(step.volume)),aspirationWarning=\(step.hasWarning),dispenseWarning=\(step.dispenseWarning)"
+                "Step \(step.sequenceNumber),source=\(step.source.well),destination=\(step.destination.well),volume=\(formattedVolume(step.volume)),volumeConfirmedValue=\(confirmedValue),volumeConfirmedAt=\(confirmedAt),aspirationWarning=\(step.hasWarning),dispenseWarning=\(step.dispenseWarning)"
             )
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    private func blockCurrentAction(title: String, detail: String) {
+        uiState.setValidationResult(
+            .blocked(detail),
+            feedback: ValidationFeedback(
+                tone: .warning,
+                title: title,
+                detail: detail
+            )
+        )
     }
 
     private func formattedVolume(_ volume: Double) -> String {

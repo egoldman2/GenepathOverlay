@@ -70,6 +70,8 @@ struct GenepathOverlayTests {
         engine.load(steps: [step])
 
         #expect(engine.currentPhase == .aspiration)
+        #expect(engine.requiresVolumeVerification)
+        #expect(engine.confirmVolumeForCurrentStep())
         _ = engine.advance()
         #expect(engine.currentPhase == .dispense)
         let nextStep = engine.advance()

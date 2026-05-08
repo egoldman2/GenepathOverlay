@@ -15,7 +15,11 @@ struct GuidedTransferHeroView: View {
 
             CompactRunStatusView()
 
-            WorkflowActionRow()
+            if appModel.isAwaitingVolumeVerification {
+                PipetteVolumeVerificationStepView()
+            } else {
+                WorkflowActionRow()
+            }
 
             if shouldShowValidationStatus {
                 ValidationStatusView()
@@ -90,7 +94,7 @@ private struct CompactRunStatusView: View {
 
     var body: some View {
         VStack(alignment: .center, spacing: 12) {
-            Text(appModel.isAwaitingTipChange ? "Tip Change" : appModel.currentPhase.title)
+            Text(stageTitle)
                 .font(.system(size: 24, weight: .bold, design: .rounded))
                 .foregroundStyle(AppUIStyle.primaryTextColor)
                 .frame(maxWidth: .infinity)
@@ -114,9 +118,25 @@ private struct CompactRunStatusView: View {
         .padding(.vertical, 6)
     }
 
+    private var stageTitle: String {
+        if appModel.isAwaitingTipChange {
+            return "Tip Change"
+        }
+
+        if appModel.isAwaitingVolumeVerification {
+            return "Volume Check"
+        }
+
+        return appModel.currentPhase.title
+    }
+
     private var statusTitle: String {
         if appModel.isAwaitingTipChange {
             return appModel.tipChangeInstructionTitle
+        }
+
+        if appModel.isAwaitingVolumeVerification {
+            return appModel.volumeVerificationInstructionTitle
         }
 
         return appModel.progressLabel
@@ -129,6 +149,10 @@ private struct CompactRunStatusView: View {
 
         if appModel.isAwaitingTipChange {
             return appModel.tipChangeInstructionDetail
+        }
+
+        if appModel.isAwaitingVolumeVerification {
+            return appModel.volumeVerificationInstructionDetail
         }
 
         if appModel.isPipettePressed {
@@ -370,7 +394,7 @@ private struct PipetteInputStatusCard: View {
     }
 }
 
-private struct TrackingGlassBackground: View {
+struct TrackingGlassBackground: View {
     var cornerRadius: CGFloat = 30
 
     var body: some View {
