@@ -211,7 +211,7 @@ struct PipetteCalibrationState: Sendable, Equatable {
         case .collectingPress:
             return "Capturing pressed thumb pose (\(pressedSampleCount)/\(requiredSampleCount))."
         case .complete:
-            return "Calibration complete. Live tip tracking uses the fixed 25 cm pipette length."
+            return "Calibration complete. Live tip tracking uses the grip pose and fixed 25 cm pipette length."
         case .failed:
             return errorMessage ?? "Calibration failed. Reset and try again."
         }

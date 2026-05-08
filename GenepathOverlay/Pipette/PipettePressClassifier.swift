@@ -7,15 +7,39 @@ struct PipetteCalibrationProfile: Sendable, Equatable {
     let pressDirection: SIMD3<Float>
     let pressThreshold: Float
     let releaseThreshold: Float
+    let maxLateralError: Float
+
+    init(
+        restThumbPosition: SIMD3<Float>,
+        pressedThumbPosition: SIMD3<Float>,
+        pressDirection: SIMD3<Float>,
+        pressThreshold: Float,
+        releaseThreshold: Float,
+        maxLateralError: Float = 0.008
+    ) {
+        self.restThumbPosition = restThumbPosition
+        self.pressedThumbPosition = pressedThumbPosition
+        self.pressDirection = pressDirection
+        self.pressThreshold = pressThreshold
+        self.releaseThreshold = releaseThreshold
+        self.maxLateralError = maxLateralError
+    }
 
     func travel(for thumbPosition: SIMD3<Float>) -> Float {
         simd_dot(thumbPosition - restThumbPosition, pressDirection)
     }
 
+    func lateralError(for thumbPosition: SIMD3<Float>) -> Float {
+        let delta = thumbPosition - restThumbPosition
+        let axialTravel = simd_dot(delta, pressDirection)
+        let lateralOffset = delta - pressDirection * axialTravel
+        return simd_length(lateralOffset)
+    }
+
     static func build(
         restSamples: [SIMD3<Float>],
         pressedSamples: [SIMD3<Float>],
-        minimumTravel: Float = 0.003
+        minimumTravel: Float = 0.004
     ) -> PipetteCalibrationProfile? {
         guard !restSamples.isEmpty, !pressedSamples.isEmpty else {
             return nil
@@ -31,14 +55,33 @@ struct PipetteCalibrationProfile: Sendable, Equatable {
         }
 
         let direction = delta / travelMagnitude
+        let lateralEnvelope = maxLateralEnvelope(
+            samples: restSamples + pressedSamples,
+            rest: rest,
+            direction: direction
+        )
 
         return PipetteCalibrationProfile(
             restThumbPosition: rest,
             pressedThumbPosition: pressed,
             pressDirection: direction,
-            pressThreshold: travelMagnitude * 0.65,
-            releaseThreshold: travelMagnitude * 0.35
+            pressThreshold: travelMagnitude * 0.75,
+            releaseThreshold: travelMagnitude * 0.30,
+            maxLateralError: max(0.006, min(0.014, lateralEnvelope * 2.5 + travelMagnitude * 0.25))
         )
+    }
+
+    private static func maxLateralEnvelope(
+        samples: [SIMD3<Float>],
+        rest: SIMD3<Float>,
+        direction: SIMD3<Float>
+    ) -> Float {
+        samples.reduce(0) { currentMax, sample in
+            let delta = sample - rest
+            let axialTravel = simd_dot(delta, direction)
+            let lateralOffset = delta - direction * axialTravel
+            return max(currentMax, simd_length(lateralOffset))
+        }
     }
 }
 
@@ -51,6 +94,7 @@ struct PipettePressClassifier {
         var pressCount = 0
         var rawTravel: Float?
         var smoothedTravel: Float?
+        var lateralError: Float?
     }
 
     let smoothingSampleCount: Int
@@ -65,7 +109,7 @@ struct PipettePressClassifier {
 
     init(
         smoothingSampleCount: Int = 5,
-        consecutiveSamplesRequired: Int = 2,
+        consecutiveSamplesRequired: Int = 3,
         minimumGripConfidence: Float = 0.55
     ) {
         self.smoothingSampleCount = smoothingSampleCount
@@ -93,6 +137,7 @@ struct PipettePressClassifier {
         output.gripConfidence = 0
         output.rawTravel = nil
         output.smoothedTravel = nil
+        output.lateralError = nil
         smoothedTravelSamples.removeAll()
         aboveThresholdCount = 0
         belowThresholdCount = 0
@@ -107,14 +152,24 @@ struct PipettePressClassifier {
 
     mutating func update(
         travel: Float?,
+        lateralError: Float? = nil,
         gripConfidence: Float,
         timestamp: Date
     ) -> Output {
         output.gripConfidence = gripConfidence
         output.rawTravel = travel
+        output.lateralError = lateralError
 
         guard let calibration, let travel, gripConfidence >= minimumGripConfidence else {
             return clearSignal(at: timestamp)
+        }
+
+        if let lateralError, lateralError > calibration.maxLateralError {
+            smoothedTravelSamples.removeAll()
+            aboveThresholdCount = 0
+            belowThresholdCount = 0
+            output.smoothedTravel = nil
+            return output
         }
 
         smoothedTravelSamples.append(travel)

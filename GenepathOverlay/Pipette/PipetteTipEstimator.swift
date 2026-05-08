@@ -6,6 +6,17 @@ struct PipetteHandPose: Sendable, Equatable {
     /// The tracked thumb point used as the hand reference. The pipette occludes
     /// most of the hand, so tip estimation must not depend on palm/knuckle joints.
     let gripReferencePosition: SIMD3<Float>
+    let tipDirectionInHandSpace: SIMD3<Float>?
+
+    init(
+        originFromAnchorTransform: simd_float4x4,
+        gripReferencePosition: SIMD3<Float>,
+        tipDirectionInHandSpace: SIMD3<Float>? = nil
+    ) {
+        self.originFromAnchorTransform = originFromAnchorTransform
+        self.gripReferencePosition = gripReferencePosition
+        self.tipDirectionInHandSpace = tipDirectionInHandSpace
+    }
 
     func worldPosition(forAnchorPosition anchorPosition: SIMD3<Float>) -> SIMD3<Float> {
         (originFromAnchorTransform * SIMD4<Float>(anchorPosition, 1)).xyz
@@ -69,7 +80,8 @@ struct PipetteTipEstimator: Sendable {
         guard let profile else { return nil }
 
         let gripWorldPosition = handPose.worldPosition(forAnchorPosition: handPose.gripReferencePosition)
-        let tipDirection = handPose.worldDirection(forAnchorDirection: profile.tipDirectionInHandSpace)
+        let anchorTipDirection = handPose.tipDirectionInHandSpace ?? profile.tipDirectionInHandSpace
+        let tipDirection = handPose.worldDirection(forAnchorDirection: anchorTipDirection)
         let rawTipPosition = gripWorldPosition + normalized(tipDirection) * profile.tipLength
 
         smoothedTipSamples.append(rawTipPosition)

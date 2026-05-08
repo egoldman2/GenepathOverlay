@@ -25,6 +25,7 @@ final class TrackingManager {
 
     private struct PipetteHandObservation {
         let thumbLocalPosition: SIMD3<Float>
+        let thumbRelativePosition: SIMD3<Float>
         let thumbWorldPosition: SIMD3<Float>
         let thumbWorldDirection: SIMD3<Float>?
         let tipDirectionInHandSpace: SIMD3<Float>
@@ -501,14 +502,14 @@ final class TrackingManager {
         case .waitingForHand:
             pipetteCalibrationState.step = .readyForRest
         case .collectingRest:
-            restCalibrationSamples.append(observation.thumbLocalPosition)
+            restCalibrationSamples.append(observation.thumbRelativePosition)
             restTipDirectionSamples.append(observation.tipDirectionInHandSpace)
             pipetteCalibrationState.restSampleCount = restCalibrationSamples.count
             if restCalibrationSamples.count >= pipetteCalibrationState.requiredSampleCount {
                 pipetteCalibrationState.step = .readyForPress
             }
         case .collectingPress:
-            pressedCalibrationSamples.append(observation.thumbLocalPosition)
+            pressedCalibrationSamples.append(observation.thumbRelativePosition)
             pipetteCalibrationState.pressedSampleCount = pressedCalibrationSamples.count
             if pressedCalibrationSamples.count >= pipetteCalibrationState.requiredSampleCount {
                 finishPressCalibration()
@@ -517,9 +518,11 @@ final class TrackingManager {
             break
         }
 
-        let travel = pipettePressClassifier.calibration?.travel(for: observation.thumbLocalPosition)
+        let travel = pipettePressClassifier.calibration?.travel(for: observation.thumbRelativePosition)
+        let lateralError = pipettePressClassifier.calibration?.lateralError(for: observation.thumbRelativePosition)
         latestPipetteOutput = pipettePressClassifier.update(
             travel: travel,
+            lateralError: lateralError,
             gripConfidence: observation.gripConfidence,
             timestamp: Date()
         )
@@ -646,7 +649,7 @@ final class TrackingManager {
         latestPipetteOutput = PipettePressClassifier.Output()
         pipetteCalibrationState.step = .complete
         pipetteCalibrationState.errorMessage = nil
-        latestTipStatus = "Fixed 25 cm tip tracking is active."
+        latestTipStatus = "Grip-based 25 cm tip tracking is active."
     }
 
     @available(visionOS 2.0, *)
@@ -662,10 +665,15 @@ final class TrackingManager {
             return nil
         }
 
-        let tipDirectionInHandSpace = anchorDirection(
-            forWorldDirection: SIMD3<Float>(0, -1, 0),
-            anchorTransform: anchor.originFromAnchorTransform
-        )
+        guard let grip = visibleGripCluster(in: handSkeleton),
+              grip.confidence >= 0.55,
+              let tipDirectionInHandSpace = pipetteTipDirection(
+                thumbLocalPoint: thumbPadLocalPoint,
+                gripCenter: grip.center
+              ) else {
+            return nil
+        }
+
         let tipWorldDirection = worldDirection(
             forAnchorDirection: tipDirectionInHandSpace,
             anchorTransform: anchor.originFromAnchorTransform
@@ -673,14 +681,16 @@ final class TrackingManager {
 
         return PipetteHandObservation(
             thumbLocalPosition: thumbPadLocalPoint,
+            thumbRelativePosition: thumbPadLocalPoint - grip.center,
             thumbWorldPosition: thumbPadWorldPoint,
             thumbWorldDirection: tipWorldDirection,
             tipDirectionInHandSpace: tipDirectionInHandSpace,
             handPose: PipetteHandPose(
                 originFromAnchorTransform: anchor.originFromAnchorTransform,
-                gripReferencePosition: thumbPadLocalPoint
+                gripReferencePosition: thumbPadLocalPoint,
+                tipDirectionInHandSpace: tipDirectionInHandSpace
             ),
-            gripConfidence: 1
+            gripConfidence: grip.confidence
         )
     }
 
@@ -706,6 +716,7 @@ final class TrackingManager {
         let fallbackJoints: [HandSkeleton.JointName] = [
             .thumbTip,
             .thumbIntermediateTip,
+            .thumbIntermediateBase,
             .thumbKnuckle
         ]
         return fallbackJoints
@@ -716,8 +727,14 @@ final class TrackingManager {
         using positionForJoint: (HandSkeleton.JointName) -> SIMD3<Float>?
     ) -> SIMD3<Float>? {
         if let tip = positionForJoint(.thumbTip),
+           let intermediate = positionForJoint(.thumbIntermediateTip),
+           let base = positionForJoint(.thumbIntermediateBase) {
+            return tip * 0.60 + intermediate * 0.30 + base * 0.10
+        }
+
+        if let tip = positionForJoint(.thumbTip),
            let intermediate = positionForJoint(.thumbIntermediateTip) {
-            return tip * 0.75 + intermediate * 0.25
+            return tip * 0.70 + intermediate * 0.30
         }
 
         for joint in thumbTrackingJoints {
@@ -729,11 +746,40 @@ final class TrackingManager {
         return nil
     }
 
-    private func anchorDirection(
-        forWorldDirection worldDirection: SIMD3<Float>,
-        anchorTransform: simd_float4x4
-    ) -> SIMD3<Float> {
-        (simd_inverse(anchorTransform) * SIMD4<Float>(worldDirection, 0)).xyz
+    @available(visionOS 2.0, *)
+    private func visibleGripCluster(in skeleton: HandSkeleton) -> (center: SIMD3<Float>, confidence: Float)? {
+        let gripJoints: [HandSkeleton.JointName] = [
+            .indexFingerTip,
+            .middleFingerTip,
+            .ringFingerTip,
+            .littleFingerTip
+        ]
+        let points = gripJoints.compactMap { jointLocalPosition($0, in: skeleton) }
+        guard points.count >= 3 else {
+            return nil
+        }
+
+        let center = points.reduce(SIMD3<Float>.zero, +) / Float(points.count)
+        let spread = points
+            .map { simd_distance($0, center) }
+            .reduce(0, +) / Float(points.count)
+        let visibilityConfidence = Float(points.count) / Float(gripJoints.count)
+        let spreadConfidence: Float = spread < 0.006 ? 0.45 : 1
+
+        return (center, min(1, visibilityConfidence * spreadConfidence))
+    }
+
+    private func pipetteTipDirection(
+        thumbLocalPoint: SIMD3<Float>,
+        gripCenter: SIMD3<Float>
+    ) -> SIMD3<Float>? {
+        let direction = gripCenter - thumbLocalPoint
+        let lengthSquared = simd_length_squared(direction)
+        guard lengthSquared > 0.000001 else {
+            return nil
+        }
+
+        return direction / sqrt(lengthSquared)
     }
 
     private func worldDirection(
