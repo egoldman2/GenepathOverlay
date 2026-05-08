@@ -26,6 +26,7 @@ final class TrackingManager {
     private struct PipetteHandObservation {
         let thumbLocalPosition: SIMD3<Float>
         let thumbRelativePosition: SIMD3<Float>
+        let buttonTravelPosition: Float
         let thumbWorldPosition: SIMD3<Float>
         let thumbWorldDirection: SIMD3<Float>?
         let tipDirectionInHandSpace: SIMD3<Float>
@@ -76,14 +77,18 @@ final class TrackingManager {
     private var pipetteTipEstimator = PipetteTipEstimator()
     private let pipetteTipWellResolver = PipetteTipWellResolver()
     private var restCalibrationSamples: [SIMD3<Float>] = []
+    private var restButtonTravelSamples: [Float] = []
     private var restTipDirectionSamples: [SIMD3<Float>] = []
     private var pressedCalibrationSamples: [SIMD3<Float>] = []
+    private var pressedButtonTravelSamples: [Float] = []
     private var latestPipetteOutput = PipettePressClassifier.Output()
     private var latestThumbWorldPosition: SIMD3<Float>?
     private var latestThumbWorldDirection: SIMD3<Float>?
     private var latestTipWorldPosition: SIMD3<Float>?
     private var latestTipConfidence: Float = 0
     private var latestTipStatus = "Tip tracking is idle."
+    private var latestTipHandPose: PipetteHandPose?
+    private var manualTipOffsetInHandSpace: SIMD3<Float> = TrackingManager.loadSavedManualTipOffset()
 
     private(set) var bundledReferenceObjectNames: [String] = [] {
         didSet { onStateChange?() }
@@ -142,6 +147,7 @@ final class TrackingManager {
         latestTipWorldPosition = nil
         latestTipConfidence = 0
         latestTipStatus = "Tip tracking is idle."
+        latestTipHandPose = nil
         pipetteTipEstimator.reset()
         latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
         updatePipetteTrackingStatus()
@@ -204,6 +210,7 @@ final class TrackingManager {
             latestTipWorldPosition = nil
             latestTipConfidence = 0
             latestTipStatus = "Tip tracking is idle."
+            latestTipHandPose = nil
             latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
         }
 
@@ -235,14 +242,17 @@ final class TrackingManager {
         }
 
         restCalibrationSamples.removeAll()
+        restButtonTravelSamples.removeAll()
         restTipDirectionSamples.removeAll()
         pressedCalibrationSamples.removeAll()
+        pressedButtonTravelSamples.removeAll()
         pipettePressClassifier.reset()
         pipetteTipEstimator.reset()
         latestPipetteOutput = PipettePressClassifier.Output()
         latestTipWorldPosition = nil
         latestTipConfidence = 0
         latestTipStatus = "Tip tracking is idle."
+        latestTipHandPose = nil
         detectedToolPose = nil
         pipetteCalibrationState.selectedHand = pipetteHandedness
         pipetteCalibrationState.restSampleCount = 0
@@ -263,11 +273,13 @@ final class TrackingManager {
         }
 
         pressedCalibrationSamples.removeAll()
+        pressedButtonTravelSamples.removeAll()
         pipetteTipEstimator.reset()
         pipetteCalibrationState.pressedSampleCount = 0
         latestTipWorldPosition = nil
         latestTipConfidence = 0
         latestTipStatus = "Tip tracking is idle."
+        latestTipHandPose = nil
         detectedToolPose = nil
         pipetteCalibrationState.errorMessage = nil
         pipetteCalibrationState.step = .collectingPress
@@ -283,8 +295,10 @@ final class TrackingManager {
         }
 
         restCalibrationSamples.removeAll()
+        restButtonTravelSamples.removeAll()
         restTipDirectionSamples.removeAll()
         pressedCalibrationSamples.removeAll()
+        pressedButtonTravelSamples.removeAll()
         pipettePressClassifier.reset()
         pipetteTipEstimator.reset()
         latestPipetteOutput = PipettePressClassifier.Output()
@@ -294,12 +308,35 @@ final class TrackingManager {
         latestTipWorldPosition = nil
         latestTipConfidence = 0
         latestTipStatus = "Tip tracking is idle."
+        latestTipHandPose = nil
         detectedToolPose = nil
         pipetteCalibrationState = .idle
         pipetteCalibrationState.selectedHand = selectedHand
         pipetteCalibrationState.step = selectedHand == nil ? .handNotSelected : .waitingForHand
         updatePipetteTrackingStatus()
         publishSnapshot()
+    }
+
+    func saveManualPipetteTipOffset() {
+        guard pipetteCalibrationState.step == .adjustingTip else { return }
+        saveManualTipOffset(manualTipOffsetInHandSpace)
+        pipetteCalibrationState.step = .complete
+        latestTipStatus = "Grip-based tip tracking is active."
+        updatePipetteTrackingStatus()
+        publishSnapshot()
+    }
+
+    func resetManualPipetteTipOffset() {
+        let oldWorldOffset = latestTipHandPose?.worldDirection(forAnchorDirection: manualTipOffsetInHandSpace) ?? .zero
+        manualTipOffsetInHandSpace = .zero
+        saveManualTipOffset(manualTipOffsetInHandSpace)
+        updateCurrentTipAfterManualOffsetChange(worldDelta: -oldWorldOffset)
+    }
+
+    func nudgeManualPipetteTipOffset(worldDelta: SIMD3<Float>) {
+        guard let latestTipHandPose else { return }
+        manualTipOffsetInHandSpace += latestTipHandPose.anchorDirection(forWorldDirection: worldDelta)
+        updateCurrentTipAfterManualOffsetChange(worldDelta: worldDelta)
     }
 
     private func installPreviewAnchors(message: String) {
@@ -510,6 +547,7 @@ final class TrackingManager {
             pipetteCalibrationState.step = .readyForRest
         case .collectingRest:
             restCalibrationSamples.append(observation.thumbRelativePosition)
+            restButtonTravelSamples.append(observation.buttonTravelPosition)
             restTipDirectionSamples.append(observation.tipDirectionInHandSpace)
             pipetteCalibrationState.restSampleCount = restCalibrationSamples.count
             if restCalibrationSamples.count >= pipetteCalibrationState.requiredSampleCount {
@@ -517,19 +555,18 @@ final class TrackingManager {
             }
         case .collectingPress:
             pressedCalibrationSamples.append(observation.thumbRelativePosition)
+            pressedButtonTravelSamples.append(observation.buttonTravelPosition)
             pipetteCalibrationState.pressedSampleCount = pressedCalibrationSamples.count
             if pressedCalibrationSamples.count >= pipetteCalibrationState.requiredSampleCount {
                 finishPressCalibration()
             }
-        case .readyForRest, .readyForPress, .complete, .failed:
+        case .readyForRest, .readyForPress, .adjustingTip, .complete, .failed:
             break
         }
 
-        let travel = pipettePressClassifier.calibration?.travel(for: observation.thumbRelativePosition)
-        let lateralError = pipettePressClassifier.calibration?.lateralError(for: observation.thumbRelativePosition)
+        let travel = pipettePressClassifier.calibration?.travel(forAxialPosition: observation.buttonTravelPosition)
         latestPipetteOutput = pipettePressClassifier.update(
             travel: travel,
-            lateralError: lateralError,
             gripConfidence: observation.gripConfidence,
             timestamp: Date()
         )
@@ -548,10 +585,18 @@ final class TrackingManager {
             return
         }
 
-        guard let tipWorldPosition = pipetteTipEstimator.estimateTipWorldPosition(for: observation.handPose) else {
+        let adjustedHandPose = PipetteHandPose(
+            originFromAnchorTransform: observation.handPose.originFromAnchorTransform,
+            gripReferencePosition: observation.handPose.gripReferencePosition + manualTipOffsetInHandSpace,
+            tipDirectionInHandSpace: observation.handPose.tipDirectionInHandSpace
+        )
+
+        guard let tipWorldPosition = pipetteTipEstimator.estimateTipWorldPosition(for: adjustedHandPose) else {
             latestTipStatus = "Tip calibration is not available."
             return
         }
+
+        latestTipHandPose = observation.handPose
 
         let resolution = pipetteTipWellResolver.resolve(
             tipWorldPosition: tipWorldPosition,
@@ -564,6 +609,27 @@ final class TrackingManager {
         latestTipConfidence = resolution.confidence
         latestTipStatus = resolution.status
         detectedToolPose = resolution.detectedPose
+    }
+
+    private func updateCurrentTipAfterManualOffsetChange(worldDelta: SIMD3<Float>) {
+        if simd_length_squared(worldDelta) > 0, let latestTipWorldPosition {
+            pipetteTipEstimator.offsetFilteredTipPosition(by: worldDelta)
+            self.latestTipWorldPosition = latestTipWorldPosition + worldDelta
+        }
+
+        if let latestTipWorldPosition {
+            let resolution = pipetteTipWellResolver.resolve(
+                tipWorldPosition: latestTipWorldPosition,
+                plateAnchors: currentPlateAnchors(),
+                coordinateMapper: coordinateMapper,
+                calibrationConfidence: pipetteTipEstimator.profile?.calibrationConfidence ?? 0
+            )
+            latestTipConfidence = resolution.confidence
+            latestTipStatus = resolution.status
+            detectedToolPose = resolution.detectedPose
+        }
+
+        publishSnapshot()
     }
 
     private func currentPlateAnchors() -> [PlateID: PlateAnchorState] {
@@ -609,12 +675,14 @@ final class TrackingManager {
         latestTipWorldPosition = nil
         latestTipConfidence = 0
         latestTipStatus = "Waiting for selected hand."
+        latestTipHandPose = nil
         detectedToolPose = nil
         latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
 
         if pipetteHandedness != nil,
            pipetteCalibrationState.isComplete == false,
-           pipetteCalibrationState.step != .handNotSelected {
+           pipetteCalibrationState.step != .handNotSelected,
+           pipetteCalibrationState.step != .adjustingTip {
             pipetteCalibrationState.step = .waitingForHand
         }
 
@@ -644,9 +712,24 @@ final class TrackingManager {
     }
 
     private func finishPressCalibration() {
+        guard let restTipDirection = averagedDirection(restTipDirectionSamples) else {
+            pipetteCalibrationState.step = .failed
+            pipetteCalibrationState.errorMessage = "Could not estimate the pipette shaft direction. Keep the thumb and fingertips visible while calibrating."
+            latestThumbWorldPosition = nil
+            latestThumbWorldDirection = nil
+            latestTipWorldPosition = nil
+            latestTipConfidence = 0
+            latestTipStatus = "Tip tracking is idle."
+            latestPipetteOutput = pipettePressClassifier.clearSignal(at: Date())
+            return
+        }
+
         guard let profile = PipetteCalibrationProfile.build(
             restSamples: restCalibrationSamples,
-            pressedSamples: pressedCalibrationSamples
+            pressedSamples: pressedCalibrationSamples,
+            restAxialSamples: restButtonTravelSamples,
+            pressedAxialSamples: pressedButtonTravelSamples,
+            pressAxisHint: restTipDirection
         ) else {
             pipetteCalibrationState.step = .failed
             pipetteCalibrationState.errorMessage = "Thumb travel was too small to calibrate. Try pressing further and recapture."
@@ -659,14 +742,13 @@ final class TrackingManager {
             return
         }
 
-        guard let restTipDirection = averagedDirection(restTipDirectionSamples),
-              let tipProfile = PipetteTipEstimatorProfile.build(
+        guard let tipProfile = PipetteTipEstimatorProfile.build(
                 from: profile,
                 tipDirectionInHandSpace: restTipDirection,
                 tipLength: 0.18
-              ) else {
+        ) else {
             pipetteCalibrationState.step = .failed
-            pipetteCalibrationState.errorMessage = "Could not initialize fixed-length pipette tip tracking."
+            pipetteCalibrationState.errorMessage = "Could not initialize grip-based pipette tip tracking."
             latestThumbWorldPosition = nil
             latestThumbWorldDirection = nil
             latestTipWorldPosition = nil
@@ -679,9 +761,9 @@ final class TrackingManager {
         pipettePressClassifier.setCalibration(profile)
         pipetteTipEstimator.setProfile(tipProfile)
         latestPipetteOutput = PipettePressClassifier.Output()
-        pipetteCalibrationState.step = .complete
+        pipetteCalibrationState.step = .adjustingTip
         pipetteCalibrationState.errorMessage = nil
-        latestTipStatus = "Grip-based tip tracking is active."
+        latestTipStatus = "Move the red tip marker onto the real pipette tip."
     }
 
     @available(visionOS 2.0, *)
@@ -706,10 +788,13 @@ final class TrackingManager {
             forAnchorDirection: grip.tipDirectionInHandSpace,
             anchorTransform: anchor.originFromAnchorTransform
         )
+        let thumbRelativePosition = thumbPadLocalPoint - grip.center
+        let buttonTravelPosition = simd_dot(thumbRelativePosition, grip.tipDirectionInHandSpace)
 
         return PipetteHandObservation(
             thumbLocalPosition: thumbPadLocalPoint,
-            thumbRelativePosition: thumbPadLocalPoint - grip.center,
+            thumbRelativePosition: thumbRelativePosition,
+            buttonTravelPosition: buttonTravelPosition,
             thumbWorldPosition: thumbPadWorldPoint,
             thumbWorldDirection: tipWorldDirection,
             tipDirectionInHandSpace: grip.tipDirectionInHandSpace,
@@ -806,7 +891,8 @@ final class TrackingManager {
             return nil
         }
 
-        let shaftReference = center * 0.90 + thumbLocalPoint * 0.10
+        let thumbBase = jointLocalPosition(.thumbIntermediateBase, in: skeleton) ?? thumbLocalPoint
+        let shaftReference = thumbBase * 0.65 + center * 0.35
         return PipetteVisibleGrip(
             center: center,
             shaftReference: shaftReference,
@@ -841,7 +927,7 @@ final class TrackingManager {
         }
 
         if let fallbackDirection {
-            return normalizedDirection(shaftDirection * 0.85 + fallbackDirection * 0.15)
+            return normalizedDirection(shaftDirection * 0.95 + fallbackDirection * 0.05)
         }
 
         return shaftDirection
@@ -1049,6 +1135,30 @@ final class TrackingManager {
         return Array(Set(types))
     }
 
+    private static var manualTipOffsetDefaultsKey: String {
+        "PipetteManualTipOffsetInHandSpace"
+    }
+
+    private static func loadSavedManualTipOffset() -> SIMD3<Float> {
+        let values = UserDefaults.standard.array(forKey: manualTipOffsetDefaultsKey) as? [Double]
+        guard let values, values.count == 3 else {
+            return .zero
+        }
+
+        return SIMD3<Float>(
+            Float(values[0]),
+            Float(values[1]),
+            Float(values[2])
+        )
+    }
+
+    private func saveManualTipOffset(_ offset: SIMD3<Float>) {
+        UserDefaults.standard.set(
+            [Double(offset.x), Double(offset.y), Double(offset.z)],
+            forKey: Self.manualTipOffsetDefaultsKey
+        )
+    }
+
     @available(visionOS 2.0, *)
     private func anchorMatchesSelectedHand(_ anchor: HandAnchor) -> Bool {
         guard let pipetteHandedness else {
@@ -1080,6 +1190,7 @@ final class TrackingManager {
                 tipWorldPosition: latestTipWorldPosition,
                 tipConfidence: latestTipConfidence,
                 tipStatus: latestTipStatus,
+                tipOffsetDistance: simd_length(manualTipOffsetInHandSpace),
                 isPressed: latestPipetteOutput.isPressed,
                 pressBeganAt: latestPipetteOutput.pressBeganAt,
                 pressEndedAt: latestPipetteOutput.pressEndedAt,

@@ -7,6 +7,7 @@
 
 import Foundation
 import SwiftUI
+import simd
 
 /// Maintains app-wide state and orchestrates the pipetting workflow.
 @MainActor
@@ -14,7 +15,10 @@ import SwiftUI
 class AppModel {
     let immersiveSpaceID = "ImmersiveSpace"
     private let isRunningTests = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
+    private let minimumCompletedPipettePressDuration: TimeInterval = 0.14
+    private let minimumWorkflowPipettePressInterval: TimeInterval = 0.75
     private var lastHandledPipetteReleaseAt: Date?
+    private var lastAcceptedPipettePressAt: Date?
 
     enum Screen {
         case home
@@ -184,6 +188,10 @@ class AppModel {
         pipetteInputState.calibration.isComplete
     }
 
+    var isAdjustingPipetteTip: Bool {
+        pipetteInputState.calibration.step == .adjustingTip
+    }
+
     var isPipettePressed: Bool {
         pipetteInputState.isPressed
     }
@@ -198,6 +206,10 @@ class AppModel {
 
     var pipetteTipConfidenceLabel: String {
         "\(Int((pipetteInputState.tipConfidence * 100).rounded()))%"
+    }
+
+    var pipetteTipOffsetLabel: String {
+        String(format: "%.1f mm", pipetteInputState.tipOffsetDistance * 1000)
     }
 
     var pipetteCalibrationProgressLabel: String {
@@ -413,6 +425,7 @@ class AppModel {
     func beginWorkflow() {
         guard sequenceEngine.totalSteps > 0 else { return }
         lastHandledPipetteReleaseAt = pipetteInputState.pressEndedAt
+        lastAcceptedPipettePressAt = nil
         currentScreen = .workflow
     }
 
@@ -603,6 +616,21 @@ class AppModel {
         syncTrackingSnapshot()
     }
 
+    func nudgePipetteTipOffset(_ worldDelta: SIMD3<Float>) {
+        trackingManager.nudgeManualPipetteTipOffset(worldDelta: worldDelta)
+        syncTrackingSnapshot()
+    }
+
+    func resetPipetteTipOffset() {
+        trackingManager.resetManualPipetteTipOffset()
+        syncTrackingSnapshot()
+    }
+
+    func savePipetteTipOffset() {
+        trackingManager.saveManualPipetteTipOffset()
+        syncTrackingSnapshot()
+    }
+
     func resetPipetteCalibration() {
         trackingManager.resetPipetteCalibration()
         syncTrackingSnapshot()
@@ -659,6 +687,13 @@ class AppModel {
             return
         }
 
+        guard isStableCompletedPipettePress(releaseAt: releaseAt),
+              canAcceptWorkflowPipettePress(at: releaseAt) else {
+            return
+        }
+
+        lastAcceptedPipettePressAt = releaseAt
+
         if tipChangeState == .awaitingEjection {
             handleTipEjectionPipettePress()
             return
@@ -675,6 +710,22 @@ class AppModel {
         }
 
         handleAutoWorkflowPipettePress()
+    }
+
+    private func isStableCompletedPipettePress(releaseAt: Date) -> Bool {
+        guard let beganAt = trackingSnapshot.pipetteInput.pressBeganAt else {
+            return false
+        }
+
+        return releaseAt.timeIntervalSince(beganAt) >= minimumCompletedPipettePressDuration
+    }
+
+    private func canAcceptWorkflowPipettePress(at releaseAt: Date) -> Bool {
+        guard let lastAcceptedPipettePressAt else {
+            return true
+        }
+
+        return releaseAt.timeIntervalSince(lastAcceptedPipettePressAt) >= minimumWorkflowPipettePressInterval
     }
 
     private func handleTipEjectionPipettePress() {

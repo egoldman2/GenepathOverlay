@@ -1,4 +1,5 @@
 import SwiftUI
+import simd
 
 struct PipetteCalibrationSetupView: View {
     @Environment(AppModel.self) private var appModel
@@ -7,6 +8,7 @@ struct PipetteCalibrationSetupView: View {
     private let settingsPresentationOverride: Bool?
     private let onBack: (() -> Void)?
     private let calibrationActionWidth: CGFloat = 240
+    private let tipNudgeStep: Float = 0.003
 
     init(
         isSettingsPresentation: Bool? = nil,
@@ -36,6 +38,8 @@ struct PipetteCalibrationSetupView: View {
         switch appModel.pipetteInputState.calibration.step {
         case .readyForPress, .collectingPress:
             return .pressedPose
+        case .adjustingTip:
+            return .tipAdjustment
         case .failed:
             return .failed
         default:
@@ -82,7 +86,7 @@ struct PipetteCalibrationSetupView: View {
             simulatorTestMenu
 
             if isSettingsMode == false {
-                SetupProgressIndicator(currentStep: 4, totalSteps: 4)
+                SetupProgressIndicator(currentStep: displayStage.stepNumber, totalSteps: 5)
             }
         }
     }
@@ -157,6 +161,9 @@ struct PipetteCalibrationSetupView: View {
                 .opacity(canCapture ? 1 : 0.45)
             }
             .frame(maxWidth: .infinity, alignment: .center)
+
+        case .tipAdjustment:
+            tipAdjustmentControls
 
         case .ready:
             HStack(spacing: 12) {
@@ -241,8 +248,77 @@ struct PipetteCalibrationSetupView: View {
                 isComplete: isPressCaptureComplete,
                 detail: pressProgressCountLabel
             )
+            CalibrationProgressBadge(
+                title: "Tip",
+                value: appModel.pipetteTipOffsetLabel,
+                isComplete: appModel.isPipetteCalibrationComplete,
+                detail: "Saved manual red-dot offset"
+            )
         }
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var tipAdjustmentControls: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 12) {
+                DetailItemView(title: "Current Offset", value: appModel.pipetteTipOffsetLabel)
+                DetailItemView(title: "Tip Confidence", value: appModel.pipetteTipConfidenceLabel)
+            }
+
+            VStack(alignment: .leading, spacing: 10) {
+                Text("Nudge marker")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.white.opacity(0.72))
+
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 10) {
+                        nudgeButton("Left", systemImage: "arrow.left", delta: SIMD3<Float>(-tipNudgeStep, 0, 0))
+                        nudgeButton("Right", systemImage: "arrow.right", delta: SIMD3<Float>(tipNudgeStep, 0, 0))
+                        nudgeButton("Up", systemImage: "arrow.up", delta: SIMD3<Float>(0, tipNudgeStep, 0))
+                        nudgeButton("Down", systemImage: "arrow.down", delta: SIMD3<Float>(0, -tipNudgeStep, 0))
+                        nudgeButton("Near", systemImage: "arrow.down.backward", delta: SIMD3<Float>(0, 0, tipNudgeStep))
+                        nudgeButton("Far", systemImage: "arrow.up.forward", delta: SIMD3<Float>(0, 0, -tipNudgeStep))
+                    }
+
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(spacing: 10) {
+                            nudgeButton("Left", systemImage: "arrow.left", delta: SIMD3<Float>(-tipNudgeStep, 0, 0))
+                            nudgeButton("Right", systemImage: "arrow.right", delta: SIMD3<Float>(tipNudgeStep, 0, 0))
+                            nudgeButton("Up", systemImage: "arrow.up", delta: SIMD3<Float>(0, tipNudgeStep, 0))
+                        }
+                        HStack(spacing: 10) {
+                            nudgeButton("Down", systemImage: "arrow.down", delta: SIMD3<Float>(0, -tipNudgeStep, 0))
+                            nudgeButton("Near", systemImage: "arrow.down.backward", delta: SIMD3<Float>(0, 0, tipNudgeStep))
+                            nudgeButton("Far", systemImage: "arrow.up.forward", delta: SIMD3<Float>(0, 0, -tipNudgeStep))
+                        }
+                    }
+                }
+            }
+
+            HStack(spacing: 12) {
+                Button {
+                    appModel.savePipetteTipOffset()
+                } label: {
+                    Label("Save Tip Position", systemImage: "checkmark")
+                }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .buttonStyle(PrimaryActionButton())
+                .disabled(appModel.pipetteInputState.tipWorldPosition == nil)
+
+                Button {
+                    appModel.resetPipetteTipOffset()
+                } label: {
+                    Label("Reset Offset", systemImage: "arrow.counterclockwise")
+                }
+                .frame(width: calibrationActionWidth)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .buttonStyle(SecondaryActionButton())
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder
@@ -320,6 +396,21 @@ struct PipetteCalibrationSetupView: View {
             .opacity(canCapture ? 1 : 0.45)
     }
 
+    private func nudgeButton(_ title: String, systemImage: String, delta: SIMD3<Float>) -> some View {
+        Button {
+            appModel.nudgePipetteTipOffset(delta)
+        } label: {
+            Label(title, systemImage: systemImage)
+        }
+        .font(.system(size: 14, weight: .semibold, design: .rounded))
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+        .frame(width: 112, height: 44)
+        .buttonStyle(SecondaryActionButton())
+        .disabled(appModel.pipetteInputState.tipWorldPosition == nil)
+        .opacity(appModel.pipetteInputState.tipWorldPosition == nil ? 0.45 : 1)
+    }
+
     @ViewBuilder
     private var simulatorTestMenu: some View {
 #if DEBUG
@@ -337,7 +428,10 @@ struct PipetteCalibrationSetupView: View {
                 Button("Step 3: Pressed Position") {
                     simulatorStageOverride = .pressedPose
                 }
-                Button("Step 4: Ready") {
+                Button("Step 4: Tip Alignment") {
+                    simulatorStageOverride = .tipAdjustment
+                }
+                Button("Step 5: Ready") {
                     simulatorStageOverride = .ready
                 }
                 Button("Failed State") {
@@ -399,6 +493,7 @@ private enum CalibrationStage: Equatable {
     case chooseHand
     case restPose
     case pressedPose
+    case tipAdjustment
     case ready
     case failed
 
@@ -410,8 +505,10 @@ private enum CalibrationStage: Equatable {
             return 2
         case .pressedPose:
             return 3
-        case .ready, .failed:
+        case .tipAdjustment:
             return 4
+        case .ready, .failed:
+            return 5
         }
     }
 
@@ -423,6 +520,8 @@ private enum CalibrationStage: Equatable {
             return "Capture rest position"
         case .pressedPose:
             return "Capture pressed position"
+        case .tipAdjustment:
+            return "Align pipette tip"
         case .ready:
             return "Pipette ready"
         case .failed:
@@ -438,6 +537,8 @@ private enum CalibrationStage: Equatable {
             return "Hold the pipette normally without pressing the plunger."
         case .pressedPose:
             return "Press and hold the plunger so the app can learn the pressed state."
+        case .tipAdjustment:
+            return "Use the red marker to save the real tip offset for this grip."
         case .ready:
             return "Calibration is complete and ready for transfer validation."
         case .failed:
@@ -453,6 +554,8 @@ private enum CalibrationStage: Equatable {
             return "Keep your thumb relaxed on the pipette, then capture the resting pose."
         case .pressedPose:
             return "Press the pipette plunger and hold it steady while the samples are captured."
+        case .tipAdjustment:
+            return "Move the red dot until it sits on the physical pipette tip, then save the tip position."
         case .ready:
             return "The app can now detect pipette presses during the guided workflow."
         case .failed:
@@ -468,6 +571,8 @@ private enum CalibrationStage: Equatable {
             return "hand.point.up.left"
         case .pressedPose:
             return "hand.tap"
+        case .tipAdjustment:
+            return "scope"
         case .ready:
             return "checkmark"
         case .failed:
@@ -481,7 +586,7 @@ private struct CalibrationStepRail: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            ForEach(1...4, id: \.self) { step in
+            ForEach(1...5, id: \.self) { step in
                 Capsule()
                     .fill(step <= currentStep ? AppUIStyle.accentColor : Color.white.opacity(0.14))
                     .frame(height: 7)

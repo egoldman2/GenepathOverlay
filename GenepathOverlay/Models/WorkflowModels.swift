@@ -206,6 +206,7 @@ enum PipetteCalibrationStep: Sendable, Equatable {
     case collectingRest
     case readyForPress
     case collectingPress
+    case adjustingTip
     case complete
     case failed
 }
@@ -236,6 +237,8 @@ struct PipetteCalibrationState: Sendable, Equatable {
             return "Press and hold the pipette button, then capture the pressed thumb pose."
         case .collectingPress:
             return "Capturing pressed thumb pose (\(pressedSampleCount)/\(requiredSampleCount))."
+        case .adjustingTip:
+            return "Move the red tip marker onto the real pipette tip, then save the offset."
         case .complete:
             return "Calibration complete. Live tip tracking uses the grip pose and visible fingertip shaft."
         case .failed:
@@ -308,6 +311,7 @@ struct PipettePressState: Sendable, Equatable {
     var tipWorldPosition: SIMD3<Float>?
     var tipConfidence: Float
     var tipStatus: String
+    var tipOffsetDistance: Float
     var isPressed: Bool
     var pressBeganAt: Date?
     var pressEndedAt: Date?
@@ -324,6 +328,7 @@ struct PipettePressState: Sendable, Equatable {
         tipWorldPosition: nil,
         tipConfidence: 0,
         tipStatus: "Tip tracking is idle.",
+        tipOffsetDistance: 0,
         isPressed: false,
         pressBeganAt: nil,
         pressEndedAt: nil,

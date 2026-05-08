@@ -29,6 +29,10 @@ struct PipetteHandPose: Sendable, Equatable {
     func worldDirection(forAnchorDirection anchorDirection: SIMD3<Float>) -> SIMD3<Float> {
         (originFromAnchorTransform * SIMD4<Float>(anchorDirection, 0)).xyz
     }
+
+    func anchorDirection(forWorldDirection worldDirection: SIMD3<Float>) -> SIMD3<Float> {
+        (simd_inverse(originFromAnchorTransform) * SIMD4<Float>(worldDirection, 0)).xyz
+    }
 }
 
 struct PipetteTipEstimatorProfile: Sendable, Equatable {
@@ -58,39 +62,57 @@ struct PipetteTipEstimatorProfile: Sendable, Equatable {
 }
 
 struct PipetteTipEstimator: Sendable {
-    private let smoothingSampleCount: Int
+    private let smoothingAlpha: Float
+    private let maximumFrameStep: Float
     private(set) var profile: PipetteTipEstimatorProfile?
-    private var smoothedTipSamples: [SIMD3<Float>] = []
+    private var filteredTipPosition: SIMD3<Float>?
 
-    init(smoothingSampleCount: Int = 4) {
-        self.smoothingSampleCount = smoothingSampleCount
+    init(
+        smoothingSampleCount: Int = 4,
+        smoothingAlpha: Float = 0.45,
+        maximumFrameStep: Float = 0.012
+    ) {
+        self.smoothingAlpha = smoothingAlpha
+        self.maximumFrameStep = maximumFrameStep
     }
 
     mutating func reset() {
         profile = nil
-        smoothedTipSamples.removeAll()
+        filteredTipPosition = nil
     }
 
     mutating func setProfile(_ profile: PipetteTipEstimatorProfile) {
         self.profile = profile
-        smoothedTipSamples.removeAll()
+        filteredTipPosition = nil
+    }
+
+    mutating func offsetFilteredTipPosition(by worldDelta: SIMD3<Float>) {
+        guard let filteredTipPosition else { return }
+        self.filteredTipPosition = filteredTipPosition + worldDelta
     }
 
     mutating func estimateTipWorldPosition(for handPose: PipetteHandPose) -> SIMD3<Float>? {
         guard let profile else { return nil }
 
         let gripWorldPosition = handPose.worldPosition(forAnchorPosition: handPose.gripReferencePosition)
-        let anchorTipDirection = blendedTipDirection(for: handPose, profile: profile)
+        let anchorTipDirection = profile.tipDirectionInHandSpace
         let tipDirection = handPose.worldDirection(forAnchorDirection: anchorTipDirection)
         let rawTipPosition = gripWorldPosition + normalized(tipDirection) * profile.tipLength
 
-        smoothedTipSamples.append(rawTipPosition)
-        if smoothedTipSamples.count > smoothingSampleCount {
-            smoothedTipSamples.removeFirst(smoothedTipSamples.count - smoothingSampleCount)
+        guard let previousTipPosition = filteredTipPosition else {
+            filteredTipPosition = rawTipPosition
+            return rawTipPosition
         }
 
-        let total = smoothedTipSamples.reduce(SIMD3<Float>.zero, +)
-        return total / Float(smoothedTipSamples.count)
+        let delta = rawTipPosition - previousTipPosition
+        let distance = simd_length(delta)
+        let clampedRawTipPosition = distance > maximumFrameStep
+            ? previousTipPosition + normalized(delta) * maximumFrameStep
+            : rawTipPosition
+        let filtered = previousTipPosition + (clampedRawTipPosition - previousTipPosition) * smoothingAlpha
+
+        filteredTipPosition = filtered
+        return filtered
     }
 
     private func normalized(_ vector: SIMD3<Float>) -> SIMD3<Float> {
@@ -99,21 +121,6 @@ struct PipetteTipEstimator: Sendable {
         return vector / sqrt(lengthSquared)
     }
 
-    private func blendedTipDirection(
-        for handPose: PipetteHandPose,
-        profile: PipetteTipEstimatorProfile
-    ) -> SIMD3<Float> {
-        guard var liveDirection = handPose.tipDirectionInHandSpace else {
-            return profile.tipDirectionInHandSpace
-        }
-
-        let calibratedDirection = profile.tipDirectionInHandSpace
-        if simd_dot(liveDirection, calibratedDirection) < 0 {
-            liveDirection = -liveDirection
-        }
-
-        return normalized(calibratedDirection * 0.75 + liveDirection * 0.25)
-    }
 }
 
 struct PipetteTipResolution: Sendable {
