@@ -11,43 +11,20 @@ struct PipetteVolumeVerificationStepView: View {
     @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        ViewThatFits(in: .horizontal) {
-            horizontalLayout
-            verticalLayout
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
-    }
-
-    private var horizontalLayout: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .center, spacing: 12) {
             targetChip
 
             Button {
                 appModel.confirmCurrentStepVolume()
             } label: {
-                Label("Volume Set", systemImage: "checkmark")
+                Label("Confirm", systemImage: "checkmark")
             }
             .modifier(VolumeActionButtonLayout())
             .buttonStyle(PrimaryActionButton())
             .disabled(appModel.currentStep == nil)
         }
         .frame(maxWidth: .infinity, alignment: .center)
-    }
-
-    private var verticalLayout: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            targetChip
-
-            Button {
-                appModel.confirmCurrentStepVolume()
-            } label: {
-                Label("Volume Set", systemImage: "checkmark")
-            }
-            .modifier(VolumeActionButtonLayout())
-            .buttonStyle(PrimaryActionButton())
-            .disabled(appModel.currentStep == nil)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 28)
     }
 
     private var targetChip: some View {
@@ -59,19 +36,13 @@ struct PipetteVolumeVerificationStepView: View {
                 .background(Circle().fill(AppUIStyle.accentColor.opacity(0.14)))
 
             VStack(alignment: .leading, spacing: 2) {
-                Text("Set volume")
+                Text("Target volume")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(appModel.volumeVerificationTargetLabel)
-                        .font(.system(size: 20, weight: .bold, design: .rounded))
-                        .foregroundStyle(AppUIStyle.primaryTextColor)
-
-                    Text("before aspiration")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
+                Text(appModel.volumeVerificationTargetLabel)
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppUIStyle.primaryTextColor)
             }
         }
         .padding(.horizontal, 14)
@@ -96,7 +67,7 @@ private struct VolumeActionButtonLayout: ViewModifier {
             .font(.system(size: 15, weight: .semibold, design: .rounded))
             .lineLimit(1)
             .minimumScaleFactor(0.75)
-            .frame(width: 188, height: 52, alignment: .center)
+            .frame(width: 168, height: 52, alignment: .center)
     }
 }
 

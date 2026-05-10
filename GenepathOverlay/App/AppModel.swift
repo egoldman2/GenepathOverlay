@@ -321,7 +321,7 @@ class AppModel {
             return "Set the pipette volume before starting the transfer."
         }
 
-        return "Adjust the pipette dial to \(formattedVolume(currentStep.volume)) before aspirating from source \(currentStep.source.well)."
+        return "Adjust the pipette dial before aspirating from source \(currentStep.source.well)."
     }
 
     var volumeVerificationTargetLabel: String {

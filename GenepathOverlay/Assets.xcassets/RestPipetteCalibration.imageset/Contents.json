@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "rest-pipette-calibration.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

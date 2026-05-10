@@ -43,7 +43,7 @@ struct GenepathOverlayApp: App {
                     appModel.setWorkflowSettingsWindowOpen(false)
                 }
         }
-        .defaultSize(width: 760, height: 560)
+        .defaultSize(width: 920, height: 680)
         .windowResizability(.contentSize)
 
         ImmersiveSpace(id: appModel.immersiveSpaceID) {

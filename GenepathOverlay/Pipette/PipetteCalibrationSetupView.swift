@@ -8,6 +8,7 @@ struct PipetteCalibrationSetupView: View {
     private let settingsPresentationOverride: Bool?
     private let onBack: (() -> Void)?
     private let calibrationActionWidth: CGFloat = 240
+    private let compactCalibrationActionWidth: CGFloat = 204
     private let tipNudgeStep: Float = 0.003
 
     init(
@@ -52,20 +53,28 @@ struct PipetteCalibrationSetupView: View {
     }
 
     var body: some View {
-        ScrollView {
-            AppSetupCard {
-                header
+        AppSetupCard {
+            header
 
+            HStack(alignment: .firstTextBaseline) {
                 Text(isSettingsMode ? "Pipette Calibration" : "Pipette calibration")
                     .font(.system(size: 34, weight: .bold, design: .rounded))
 
-                CalibrationStepRail(currentStep: displayStage.stepNumber)
+                Spacer(minLength: 12)
 
-                stageCard
-
-                footerActions
+                topMixedRealityStatus
             }
+
+            VStack(spacing: 12) {
+                CalibrationStepRail(currentStep: displayStage.stepNumber)
+                compactCalibrationProgress
+            }
+            .padding(.top, -4)
+            .padding(.bottom, -8)
+
+            stageCard
         }
+        .frame(maxHeight: .infinity, alignment: .top)
     }
 
     private var header: some View {
@@ -93,29 +102,32 @@ struct PipetteCalibrationSetupView: View {
 
     @ViewBuilder
     private var stageCard: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            VStack(alignment: .leading, spacing: 10) {
-                Text(displayStage.title)
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(AppUIStyle.primaryTextColor)
+        VStack(alignment: .leading, spacing: 12) {
+            Text(displayStage.title)
+                .font(.title3.weight(.bold))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
 
-                calibrationProgressGroup
-            }
+            HStack(alignment: .top, spacing: 20) {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(displayStage.instruction)
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .foregroundStyle(Color.white.opacity(0.72))
+                        .fixedSize(horizontal: false, vertical: true)
 
-            Divider()
-                .overlay(Color.white.opacity(0.12))
+                    stageControls
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            VStack(alignment: .leading, spacing: 18) {
-                Text(displayStage.instruction)
-                    .font(.system(size: 18, weight: .regular, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.72))
-                    .fixedSize(horizontal: false, vertical: true)
-
-                stageControls
+                if let illustrationAssetName = displayStage.illustrationAssetName {
+                    CalibrationPoseIllustration(
+                        assetName: illustrationAssetName,
+                        accessibilityLabel: displayStage.illustrationAccessibilityLabel,
+                        size: displayStage.illustrationSize
+                    )
+                }
             }
         }
-        .padding(24)
-        .background(CalibrationGlassBackground(cornerRadius: 24))
+        .padding(.top, 4)
     }
 
     @ViewBuilder
@@ -130,14 +142,14 @@ struct PipetteCalibrationSetupView: View {
 
         case .restPose:
             HStack(spacing: 12) {
-                captureOrOpenButton(title: "Capture Rest Position") {
+                captureOrOpenButton(title: "Capture Rest Position", width: compactCalibrationActionWidth) {
                     appModel.startRestCalibrationCapture()
                 }
 
                 Button("Change Hand") {
                     appModel.setPipetteHandedness(nil)
                 }
-                .frame(width: calibrationActionWidth)
+                .frame(width: compactCalibrationActionWidth)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
@@ -146,14 +158,14 @@ struct PipetteCalibrationSetupView: View {
 
         case .pressedPose:
             HStack(spacing: 12) {
-                captureOrOpenButton(title: "Capture Pressed Position") {
+                captureOrOpenButton(title: "Capture Pressed Position", width: compactCalibrationActionWidth) {
                     appModel.startPressedCalibrationCapture()
                 }
 
                 Button("Recapture Rest") {
                     appModel.startRestCalibrationCapture()
                 }
-                .frame(width: calibrationActionWidth)
+                .frame(width: compactCalibrationActionWidth)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
@@ -234,65 +246,38 @@ struct PipetteCalibrationSetupView: View {
         }
     }
 
-    private var calibrationProgressGroup: some View {
-        HStack(spacing: 14) {
-            CalibrationProgressBadge(
-                title: "Rest",
-                value: restProgressPercentageLabel,
-                isComplete: isRestCaptureComplete,
-                detail: restProgressCountLabel
-            )
-            CalibrationProgressBadge(
-                title: "Press",
-                value: pressProgressPercentageLabel,
-                isComplete: isPressCaptureComplete,
-                detail: pressProgressCountLabel
-            )
-            CalibrationProgressBadge(
-                title: "Tip",
-                value: appModel.pipetteTipOffsetLabel,
-                isComplete: appModel.isPipetteCalibrationComplete,
-                detail: "Saved manual red-dot offset"
-            )
+    @ViewBuilder
+    private var topMixedRealityStatus: some View {
+        if appModel.immersiveSpaceState == .open {
+            Label("Mixed Reality View open", systemImage: "visionpro")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.58))
+        } else if displayStage != .ready {
+            mixedRealityControl
+        }
+    }
+
+    private var compactCalibrationProgress: some View {
+        HStack(spacing: 8) {
+            calibrationProgressPill(title: "Rest", value: restProgressPercentageLabel, isComplete: isRestCaptureComplete)
+            calibrationProgressPill(title: "Press", value: pressProgressPercentageLabel, isComplete: isPressCaptureComplete)
+            calibrationProgressPill(title: "Tip", value: appModel.pipetteTipOffsetLabel, isComplete: appModel.isPipetteCalibrationComplete)
         }
         .frame(maxWidth: .infinity, alignment: .center)
     }
 
     private var tipAdjustmentControls: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 12) {
-                DetailItemView(title: "Current Offset", value: appModel.pipetteTipOffsetLabel)
-                DetailItemView(title: "Tip Confidence", value: appModel.pipetteTipConfidenceLabel)
-            }
-
-            VStack(alignment: .leading, spacing: 10) {
-                Text("Nudge marker")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color.white.opacity(0.72))
-
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 10) {
-                        nudgeButton("Left", systemImage: "arrow.left", delta: SIMD3<Float>(-tipNudgeStep, 0, 0))
-                        nudgeButton("Right", systemImage: "arrow.right", delta: SIMD3<Float>(tipNudgeStep, 0, 0))
-                        nudgeButton("Up", systemImage: "arrow.up", delta: SIMD3<Float>(0, tipNudgeStep, 0))
-                        nudgeButton("Down", systemImage: "arrow.down", delta: SIMD3<Float>(0, -tipNudgeStep, 0))
-                        nudgeButton("Near", systemImage: "arrow.down.backward", delta: SIMD3<Float>(0, 0, tipNudgeStep))
-                        nudgeButton("Far", systemImage: "arrow.up.forward", delta: SIMD3<Float>(0, 0, -tipNudgeStep))
-                    }
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(spacing: 10) {
-                            nudgeButton("Left", systemImage: "arrow.left", delta: SIMD3<Float>(-tipNudgeStep, 0, 0))
-                            nudgeButton("Right", systemImage: "arrow.right", delta: SIMD3<Float>(tipNudgeStep, 0, 0))
-                            nudgeButton("Up", systemImage: "arrow.up", delta: SIMD3<Float>(0, tipNudgeStep, 0))
-                        }
-                        HStack(spacing: 10) {
-                            nudgeButton("Down", systemImage: "arrow.down", delta: SIMD3<Float>(0, -tipNudgeStep, 0))
-                            nudgeButton("Near", systemImage: "arrow.down.backward", delta: SIMD3<Float>(0, 0, tipNudgeStep))
-                            nudgeButton("Far", systemImage: "arrow.up.forward", delta: SIMD3<Float>(0, 0, -tipNudgeStep))
-                        }
-                    }
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 22) {
+                VStack(alignment: .leading, spacing: 10) {
+                    calibrationMetricChip(title: "Current Offset", value: appModel.pipetteTipOffsetLabel)
+                    calibrationMetricChip(title: "Tip Confidence", value: appModel.pipetteTipConfidenceLabel)
                 }
+                .frame(width: 278)
+
+                Spacer(minLength: 0)
+
+                nudgeMarkerPad
             }
 
             HStack(spacing: 12) {
@@ -301,7 +286,7 @@ struct PipetteCalibrationSetupView: View {
                 } label: {
                     Label("Save Tip Position", systemImage: "checkmark")
                 }
-                .frame(width: calibrationActionWidth)
+                .frame(width: compactCalibrationActionWidth)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .buttonStyle(PrimaryActionButton())
@@ -312,35 +297,89 @@ struct PipetteCalibrationSetupView: View {
                 } label: {
                     Label("Reset Offset", systemImage: "arrow.counterclockwise")
                 }
-                .frame(width: calibrationActionWidth)
+                .frame(width: compactCalibrationActionWidth)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    @ViewBuilder
-    private var footerActions: some View {
-        HStack {
-            if appModel.immersiveSpaceState == .open {
-                Label("Mixed Reality View open", systemImage: "visionpro")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.white.opacity(0.58))
-            } else if displayStage != .ready {
-                mixedRealityControl
+    private var nudgeMarkerPad: some View {
+        VStack(alignment: .center, spacing: 8) {
+            Text("Nudge marker")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.72))
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            HStack(spacing: 8) {
+                Spacer()
+                    .frame(width: 98, height: 38)
+                nudgeButton("Up", systemImage: "arrow.up", delta: SIMD3<Float>(0, tipNudgeStep, 0))
+                Spacer()
+                    .frame(width: 98, height: 38)
             }
 
-            Spacer(minLength: 0)
+            HStack(spacing: 8) {
+                nudgeButton("Left", systemImage: "arrow.left", delta: SIMD3<Float>(-tipNudgeStep, 0, 0))
+                nudgeButton("Down", systemImage: "arrow.down", delta: SIMD3<Float>(0, -tipNudgeStep, 0))
+                nudgeButton("Right", systemImage: "arrow.right", delta: SIMD3<Float>(tipNudgeStep, 0, 0))
+            }
 
-            footerSecondaryAction
+            HStack(spacing: 8) {
+                nudgeButton("Near", systemImage: "arrow.down.backward", delta: SIMD3<Float>(0, 0, tipNudgeStep))
+                nudgeButton("Far", systemImage: "arrow.up.forward", delta: SIMD3<Float>(0, 0, -tipNudgeStep))
+            }
+            .frame(maxWidth: .infinity)
         }
+        .frame(width: 310)
     }
 
-    @ViewBuilder
-    private var footerSecondaryAction: some View {
-        
+    private func calibrationMetricChip(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.58))
+
+            Text(value)
+                .font(.system(size: 23, weight: .bold, design: .rounded))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 11)
+        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
+    }
+
+    private func calibrationProgressPill(title: String, value: String, isComplete: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: isComplete ? "checkmark.circle.fill" : "circle")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(isComplete ? AppUIStyle.accentColor : Color.white.opacity(0.38))
+
+            Text(title)
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.62))
+
+            Text(isComplete ? "Ready" : value)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.white.opacity(0.055), in: Capsule())
+        .overlay(
+            Capsule()
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        )
     }
 
     private var isRestCaptureComplete: Bool {
@@ -369,16 +408,6 @@ struct PipetteCalibrationSetupView: View {
         )
     }
 
-    private var restProgressCountLabel: String {
-        let calibration = appModel.pipetteInputState.calibration
-        return "\(calibration.restSampleCount) of \(calibration.requiredSampleCount) rest samples captured"
-    }
-
-    private var pressProgressCountLabel: String {
-        let calibration = appModel.pipetteInputState.calibration
-        return "\(calibration.pressedSampleCount) of \(calibration.requiredSampleCount) pressed samples captured"
-    }
-
     private func progressPercentageLabel(sampleCount: Int, requiredSampleCount: Int) -> String {
         guard requiredSampleCount > 0 else { return "0%" }
         let progress = min(Double(sampleCount) / Double(requiredSampleCount), 1)
@@ -386,9 +415,13 @@ struct PipetteCalibrationSetupView: View {
     }
 
     @ViewBuilder
-    private func captureOrOpenButton(title: String, action: @escaping () -> Void) -> some View {
+    private func captureOrOpenButton(
+        title: String,
+        width: CGFloat? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
         Button(title, action: action)
-            .frame(width: calibrationActionWidth)
+            .frame(width: width ?? calibrationActionWidth)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
             .buttonStyle(PrimaryActionButton())
@@ -405,7 +438,7 @@ struct PipetteCalibrationSetupView: View {
         .font(.system(size: 14, weight: .semibold, design: .rounded))
         .lineLimit(1)
         .minimumScaleFactor(0.75)
-        .frame(width: 112, height: 44)
+        .frame(width: 98, height: 38)
         .buttonStyle(SecondaryActionButton())
         .disabled(appModel.pipetteInputState.tipWorldPosition == nil)
         .opacity(appModel.pipetteInputState.tipWorldPosition == nil ? 0.45 : 1)
@@ -579,6 +612,52 @@ private enum CalibrationStage: Equatable {
             return "exclamationmark"
         }
     }
+
+    var illustrationAssetName: String? {
+        switch self {
+        case .restPose:
+            return "RestPipetteCalibration"
+        case .pressedPose:
+            return "PressedPipetteCalibration"
+        case .chooseHand, .tipAdjustment, .ready, .failed:
+            return nil
+        }
+    }
+
+    var illustrationAccessibilityLabel: String {
+        switch self {
+        case .restPose:
+            return "Example grip with the thumb relaxed above the pipette plunger."
+        case .pressedPose:
+            return "Example grip with the thumb pressing the pipette plunger."
+        case .chooseHand, .tipAdjustment, .ready, .failed:
+            return ""
+        }
+    }
+
+    var illustrationSize: CGSize {
+        switch self {
+        case .restPose, .pressedPose:
+            return CGSize(width: 196, height: 158)
+        case .chooseHand, .tipAdjustment, .ready, .failed:
+            return .zero
+        }
+    }
+}
+
+private struct CalibrationPoseIllustration: View {
+    let assetName: String
+    let accessibilityLabel: String
+    let size: CGSize
+
+    var body: some View {
+        Image(assetName)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size.width, height: size.height)
+            .padding(.horizontal, 8)
+            .accessibilityLabel(accessibilityLabel)
+    }
 }
 
 private struct CalibrationStepRail: View {
@@ -604,77 +683,6 @@ private struct CalibrationStepRail: View {
             }
         }
         .padding(.top, 12)
-    }
-}
-
-private struct CalibrationProgressBadge: View {
-    let title: String
-    let value: String
-    let isComplete: Bool
-    let detail: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            ZStack {
-                Circle()
-                    .stroke(Color.white.opacity(0.16), lineWidth: 3)
-                    .frame(width: 32, height: 32)
-
-                if isComplete {
-                    Image(systemName: "checkmark")
-                        .font(.subheadline.weight(.bold))
-                        .foregroundStyle(AppUIStyle.accentColor)
-                } else {
-                    Circle()
-                        .trim(from: 0, to: progress)
-                        .stroke(AppUIStyle.accentColor, style: StrokeStyle(lineWidth: 3, lineCap: .round))
-                        .frame(width: 32, height: 32)
-                        .rotationEffect(.degrees(-90))
-                }
-            }
-
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(Color.white.opacity(0.64))
-
-            Text(isComplete ? "Ready" : value)
-                .font(.headline.weight(.bold))
-                .foregroundStyle(AppUIStyle.primaryTextColor)
-                .lineLimit(1)
-        }
-        .frame(minWidth: 150, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 13)
-        .background(Capsule().fill(Color.white.opacity(0.07)))
-        .background(Capsule().fill(.regularMaterial))
-        .overlay(
-            Capsule()
-                .stroke(Color.white.opacity(0.12), lineWidth: 1)
-        )
-        .help(detail)
-    }
-
-    private var progress: CGFloat {
-        let number = value.replacingOccurrences(of: "%", with: "")
-        guard let percentage = Double(number) else { return 0 }
-        return CGFloat(min(max(percentage / 100, 0), 1))
-    }
-}
-
-private struct CalibrationGlassBackground: View {
-    var cornerRadius: CGFloat = 20
-
-    var body: some View {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-            .fill(Color.white.opacity(0.08))
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .fill(.regularMaterial)
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
-            )
     }
 }
 

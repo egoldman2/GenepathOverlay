@@ -93,29 +93,42 @@ private struct CompactRunStatusView: View {
     @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        VStack(alignment: .center, spacing: 12) {
-            Text(stageTitle)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(AppUIStyle.primaryTextColor)
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 13)
-                .background(TrackingGlassBackground(cornerRadius: 24))
-
-            VStack(alignment: .center, spacing: 5) {
-                Text(statusTitle)
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+        if appModel.isAwaitingTipChange {
+            TipChangeRunStatusView(
+                title: stageTitle,
+                statusTitle: statusTitle,
+                statusText: statusText
+            )
+        } else if appModel.isAwaitingVolumeVerification {
+            VolumeCheckRunStatusView(
+                title: stageTitle,
+                statusText: statusText
+            )
+        } else {
+            VStack(alignment: .center, spacing: 12) {
+                Text(stageTitle)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
                     .foregroundStyle(AppUIStyle.primaryTextColor)
-                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 13)
+                    .background(TrackingGlassBackground(cornerRadius: 24))
 
-                Text(statusText)
-                    .font(.system(size: 17, weight: .regular, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                VStack(alignment: .center, spacing: 5) {
+                    Text(statusTitle)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundStyle(AppUIStyle.primaryTextColor)
+                        .multilineTextAlignment(.center)
+
+                    Text(statusText)
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 6)
         }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(.vertical, 6)
     }
 
     private var stageTitle: String {
@@ -163,6 +176,63 @@ private struct CompactRunStatusView: View {
     }
 }
 
+private struct VolumeCheckRunStatusView: View {
+    let title: String
+    let statusText: String
+
+    var body: some View {
+        VStack(alignment: .center, spacing: 10) {
+            Text(title)
+                .font(.system(size: 27, weight: .bold, design: .rounded))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+                .multilineTextAlignment(.center)
+
+            Text(statusText)
+                .font(.system(size: 16, weight: .regular, design: .rounded))
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 390)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 6)
+    }
+}
+
+private struct TipChangeRunStatusView: View {
+    let title: String
+    let statusTitle: String
+    let statusText: String
+
+    var body: some View {
+        VStack(alignment: .center, spacing: 14) {
+            Text(title)
+                .font(.system(size: 30, weight: .bold, design: .rounded))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+                .multilineTextAlignment(.center)
+
+            VStack(alignment: .center, spacing: 8) {
+                Text(statusTitle)
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
+                    .foregroundStyle(AppUIStyle.primaryTextColor)
+                    .multilineTextAlignment(.center)
+
+                Text(statusText)
+                    .font(.system(size: 17, weight: .regular, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 360)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(.top, 18)
+        .padding(.bottom, 4)
+    }
+}
+
 private struct WorkflowActionRow: View {
     @Environment(AppModel.self) private var appModel
     private let actionButtonWidth: CGFloat = 188
@@ -195,6 +265,7 @@ private struct WorkflowActionRow: View {
                         Capsule()
                             .fill(Color.white.opacity(0.08))
                     )
+                    .frame(maxWidth: .infinity, alignment: .center)
             case .awaitingReplacement:
                 Button("Fresh Tip Attached") {
                     appModel.confirmTipReplacement()
