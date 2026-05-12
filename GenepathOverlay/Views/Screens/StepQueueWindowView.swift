@@ -92,7 +92,7 @@ private struct StepQueueRowView: View {
     let currentStage: String?
 
     var body: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: 8) {
             Text("Step \(step.sequenceNumber)")
                 .font(.subheadline.weight(.semibold))
                 .frame(width: 70, alignment: .leading)
@@ -100,14 +100,21 @@ private struct StepQueueRowView: View {
             Text(step.source.well)
                 .font(.subheadline)
                 .foregroundStyle(AppUIStyle.primaryTextColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(width: 38, alignment: .trailing)
 
             Image(systemName: "arrow.right")
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .frame(width: 20, alignment: .center)
 
             Text(step.destination.well)
                 .font(.subheadline)
                 .foregroundStyle(AppUIStyle.primaryTextColor)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(width: 38, alignment: .leading)
 
             Spacer(minLength: 0)
 
@@ -127,7 +134,7 @@ private struct StepQueueRowView: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
-                .frame(width: 52, alignment: .trailing)
+                .frame(width: 56, alignment: .trailing)
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)

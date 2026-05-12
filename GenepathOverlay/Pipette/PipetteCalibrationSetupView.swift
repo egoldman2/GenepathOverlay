@@ -9,6 +9,8 @@ struct PipetteCalibrationSetupView: View {
     private let onBack: (() -> Void)?
     private let calibrationActionWidth: CGFloat = 240
     private let compactCalibrationActionWidth: CGFloat = 204
+    private let poseCalibrationActionWidth: CGFloat = 236
+    private let poseCalibrationActionHeight: CGFloat = 54
     private let tipNudgeStep: Float = 0.003
 
     init(
@@ -113,6 +115,7 @@ struct PipetteCalibrationSetupView: View {
                         .font(.system(size: 17, weight: .regular, design: .rounded))
                         .foregroundStyle(Color.white.opacity(0.72))
                         .fixedSize(horizontal: false, vertical: true)
+                        .frame(minHeight: displayStage.isPoseCapture ? 44 : nil, alignment: .topLeading)
 
                     stageControls
                 }
@@ -141,38 +144,30 @@ struct PipetteCalibrationSetupView: View {
             .frame(maxWidth: .infinity, alignment: .center)
 
         case .restPose:
-            HStack(spacing: 12) {
-                captureOrOpenButton(title: "Capture Rest Position", width: compactCalibrationActionWidth) {
+            poseCaptureControls(
+                primaryTitle: "Capture Rest Position",
+                secondaryTitle: "Change Hand",
+                secondaryDisabled: false,
+                primaryAction: {
                     appModel.startRestCalibrationCapture()
-                }
-
-                Button("Change Hand") {
+                },
+                secondaryAction: {
                     appModel.setPipetteHandedness(nil)
                 }
-                .frame(width: compactCalibrationActionWidth)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .buttonStyle(SecondaryActionButton())
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
+            )
 
         case .pressedPose:
-            HStack(spacing: 12) {
-                captureOrOpenButton(title: "Capture Pressed Position", width: compactCalibrationActionWidth) {
+            poseCaptureControls(
+                primaryTitle: "Capture Pressed Position",
+                secondaryTitle: "Recapture Rest",
+                secondaryDisabled: !canCapture,
+                primaryAction: {
                     appModel.startPressedCalibrationCapture()
-                }
-
-                Button("Recapture Rest") {
+                },
+                secondaryAction: {
                     appModel.startRestCalibrationCapture()
                 }
-                .frame(width: compactCalibrationActionWidth)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .buttonStyle(SecondaryActionButton())
-                .disabled(!canCapture)
-                .opacity(canCapture ? 1 : 0.45)
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
+            )
 
         case .tipAdjustment:
             tipAdjustmentControls
@@ -268,17 +263,16 @@ struct PipetteCalibrationSetupView: View {
 
     private var tipAdjustmentControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .top, spacing: 22) {
+            HStack(alignment: .top, spacing: 20) {
                 VStack(alignment: .leading, spacing: 10) {
                     calibrationMetricChip(title: "Current Offset", value: appModel.pipetteTipOffsetLabel)
                     calibrationMetricChip(title: "Tip Confidence", value: appModel.pipetteTipConfidenceLabel)
                 }
-                .frame(width: 278)
-
-                Spacer(minLength: 0)
+                .frame(width: 268)
 
                 nudgeMarkerPad
             }
+            .frame(maxWidth: .infinity, alignment: .center)
 
             HStack(spacing: 12) {
                 Button {
@@ -286,10 +280,10 @@ struct PipetteCalibrationSetupView: View {
                 } label: {
                     Label("Save Tip Position", systemImage: "checkmark")
                 }
-                .frame(width: compactCalibrationActionWidth)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .buttonStyle(PrimaryActionButton())
+                .frame(width: 232, height: 54)
                 .disabled(appModel.pipetteInputState.tipWorldPosition == nil)
 
                 Button {
@@ -297,10 +291,10 @@ struct PipetteCalibrationSetupView: View {
                 } label: {
                     Label("Reset Offset", systemImage: "arrow.counterclockwise")
                 }
-                .frame(width: compactCalibrationActionWidth)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .buttonStyle(SecondaryActionButton())
+                .frame(width: 232, height: 54)
             }
             .frame(maxWidth: .infinity, alignment: .center)
         }
@@ -314,27 +308,25 @@ struct PipetteCalibrationSetupView: View {
                 .foregroundStyle(Color.white.opacity(0.72))
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            HStack(spacing: 8) {
-                Spacer()
-                    .frame(width: 98, height: 38)
-                nudgeButton("Up", systemImage: "arrow.up", delta: SIMD3<Float>(0, tipNudgeStep, 0))
-                Spacer()
-                    .frame(width: 98, height: 38)
-            }
+            HStack(alignment: .center, spacing: 14) {
+                VStack(spacing: 8) {
+                    nudgeButton("Near", systemImage: "arrow.down.backward", delta: SIMD3<Float>(0, 0, tipNudgeStep))
+                    nudgeButton("Far", systemImage: "arrow.up.forward", delta: SIMD3<Float>(0, 0, -tipNudgeStep))
+                }
 
-            HStack(spacing: 8) {
-                nudgeButton("Left", systemImage: "arrow.left", delta: SIMD3<Float>(-tipNudgeStep, 0, 0))
-                nudgeButton("Down", systemImage: "arrow.down", delta: SIMD3<Float>(0, -tipNudgeStep, 0))
-                nudgeButton("Right", systemImage: "arrow.right", delta: SIMD3<Float>(tipNudgeStep, 0, 0))
-            }
+                VStack(spacing: 8) {
+                    nudgeButton("Up", systemImage: "arrow.up", delta: SIMD3<Float>(0, tipNudgeStep, 0))
 
-            HStack(spacing: 8) {
-                nudgeButton("Near", systemImage: "arrow.down.backward", delta: SIMD3<Float>(0, 0, tipNudgeStep))
-                nudgeButton("Far", systemImage: "arrow.up.forward", delta: SIMD3<Float>(0, 0, -tipNudgeStep))
+                    HStack(spacing: 8) {
+                        nudgeButton("Left", systemImage: "arrow.left", delta: SIMD3<Float>(-tipNudgeStep, 0, 0))
+                        nudgeButton("Right", systemImage: "arrow.right", delta: SIMD3<Float>(tipNudgeStep, 0, 0))
+                    }
+
+                    nudgeButton("Down", systemImage: "arrow.down", delta: SIMD3<Float>(0, -tipNudgeStep, 0))
+                }
             }
-            .frame(maxWidth: .infinity)
         }
-        .frame(width: 310)
+        .frame(width: 352)
     }
 
     private func calibrationMetricChip(title: String, value: String) -> some View {
@@ -429,6 +421,35 @@ struct PipetteCalibrationSetupView: View {
             .opacity(canCapture ? 1 : 0.45)
     }
 
+    private func poseCaptureControls(
+        primaryTitle: String,
+        secondaryTitle: String,
+        secondaryDisabled: Bool,
+        primaryAction: @escaping () -> Void,
+        secondaryAction: @escaping () -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            Button(primaryTitle, action: primaryAction)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(width: poseCalibrationActionWidth, height: poseCalibrationActionHeight)
+                .buttonStyle(PrimaryActionButton())
+                .disabled(!canCapture)
+                .opacity(canCapture ? 1 : 0.45)
+
+            Button(secondaryTitle, action: secondaryAction)
+                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+                .frame(width: poseCalibrationActionWidth, height: poseCalibrationActionHeight)
+                .buttonStyle(SecondaryActionButton())
+                .disabled(secondaryDisabled)
+                .opacity(secondaryDisabled ? 0.45 : 1)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
     private func nudgeButton(_ title: String, systemImage: String, delta: SIMD3<Float>) -> some View {
         Button {
             appModel.nudgePipetteTipOffset(delta)
@@ -438,8 +459,8 @@ struct PipetteCalibrationSetupView: View {
         .font(.system(size: 14, weight: .semibold, design: .rounded))
         .lineLimit(1)
         .minimumScaleFactor(0.75)
-        .frame(width: 98, height: 38)
-        .buttonStyle(SecondaryActionButton())
+        .buttonStyle(NudgeMarkerButtonStyle(width: 112, height: 38))
+        .frame(width: 112, height: 38)
         .disabled(appModel.pipetteInputState.tipWorldPosition == nil)
         .opacity(appModel.pipetteInputState.tipWorldPosition == nil ? 0.45 : 1)
     }
@@ -643,6 +664,15 @@ private enum CalibrationStage: Equatable {
             return .zero
         }
     }
+
+    var isPoseCapture: Bool {
+        switch self {
+        case .restPose, .pressedPose:
+            return true
+        case .chooseHand, .tipAdjustment, .ready, .failed:
+            return false
+        }
+    }
 }
 
 private struct CalibrationPoseIllustration: View {
@@ -656,7 +686,32 @@ private struct CalibrationPoseIllustration: View {
             .scaledToFit()
             .frame(width: size.width, height: size.height)
             .padding(.horizontal, 8)
+            .offset(x: -34)
             .accessibilityLabel(accessibilityLabel)
+    }
+}
+
+private struct NudgeMarkerButtonStyle: ButtonStyle {
+    let width: CGFloat
+    let height: CGFloat
+    private let shape = Capsule()
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.semibold)
+            .foregroundStyle(.white)
+            .frame(width: width, height: height)
+            .contentShape([.interaction, .hoverEffect], shape)
+            .background(
+                shape
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.10 : 0.08))
+                    .background(shape.fill(.regularMaterial))
+            )
+            .overlay(
+                shape
+                    .stroke(Color.white.opacity(0.14), lineWidth: 1)
+            )
+            .hoverEffect(.lift)
     }
 }
 
