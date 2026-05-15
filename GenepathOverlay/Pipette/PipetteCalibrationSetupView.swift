@@ -468,15 +468,15 @@ struct PipetteCalibrationSetupView: View {
         isComplete: Bool,
         isActive: Bool = false
     ) -> some View {
-        let indicatorColor = isComplete
-            ? AppUIStyle.accentColor
-            : (isActive ? AppUIStyle.feedbackColor(for: .success) : Color.white.opacity(0.38))
+        let indicatorColor = isActive
+            ? AppUIStyle.feedbackColor(for: .success)
+            : (isComplete ? AppUIStyle.accentColor : Color.white.opacity(0.38))
 
-        let pillStrokeColor = isActive && !isComplete
+        let pillStrokeColor = isActive
             ? AppUIStyle.feedbackColor(for: .success).opacity(0.36)
             : Color.white.opacity(0.1)
 
-        let pillBackgroundColor = isActive && !isComplete
+        let pillBackgroundColor = isActive
             ? AppUIStyle.feedbackColor(for: .success).opacity(0.14)
             : Color.white.opacity(0.055)
 
@@ -487,7 +487,7 @@ struct PipetteCalibrationSetupView: View {
 
             Text(title)
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(isActive && !isComplete ? AppUIStyle.primaryTextColor : Color.white.opacity(0.62))
+                .foregroundStyle(isActive ? AppUIStyle.primaryTextColor : Color.white.opacity(0.62))
 
             Text(isComplete ? "Ready" : value)
                 .font(.caption2.weight(.bold))
