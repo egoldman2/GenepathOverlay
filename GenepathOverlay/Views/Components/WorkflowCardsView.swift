@@ -248,11 +248,11 @@ private struct WorkflowActionRow: View {
                                 .fill(Color.white.opacity(0.08))
                         )
 
-                    Button("Manual Eject") {
+                    Button("Confirm Ejected") {
                         appModel.confirmTipEjectionManually()
                     }
                     .modifier(WorkflowActionButtonLayout(width: actionButtonWidth + 24, height: actionButtonHeight, font: actionButtonFont))
-                    .buttonStyle(SecondaryActionButton())
+                    .buttonStyle(DestructiveActionButton())
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
             case .awaitingReplacement:
