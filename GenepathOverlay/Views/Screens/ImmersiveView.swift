@@ -28,7 +28,9 @@ struct ImmersiveView: View {
                 trackingSnapshot: appModel.trackingSnapshot,
                 mapper: appModel.coordinateMapper,
                 highlightedCoordinates: appModel.overlayHighlightedCoordinates,
-                showTestPlateModel: appModel.isShowingTestWellPlate
+                showTestPlateModel: appModel.isShowingTestWellPlate,
+                isTipAdjustmentActive: appModel.isAdjustingPipetteTip,
+                isTipEstimateFrozen: appModel.isPipetteTipEstimateFrozen
             )
         } update: { content in
             appModel.overlayRenderer.installIfNeeded(
@@ -40,9 +42,23 @@ struct ImmersiveView: View {
                 trackingSnapshot: appModel.trackingSnapshot,
                 mapper: appModel.coordinateMapper,
                 highlightedCoordinates: appModel.overlayHighlightedCoordinates,
-                showTestPlateModel: appModel.isShowingTestWellPlate
+                showTestPlateModel: appModel.isShowingTestWellPlate,
+                isTipAdjustmentActive: appModel.isAdjustingPipetteTip,
+                isTipEstimateFrozen: appModel.isPipetteTipEstimateFrozen
             )
         }
+        .gesture(
+            SpatialTapGesture()
+                .targetedToAnyEntity()
+                .onEnded { value in
+                    guard appModel.isAdjustingPipetteTip,
+                          appModel.overlayRenderer.isEstimatedTipInteractionEntity(value.entity) else {
+                        return
+                    }
+
+                    appModel.toggleFrozenPipetteTipEstimate()
+                }
+        )
         .task {
             appModel.prepareForLaunch()
         }

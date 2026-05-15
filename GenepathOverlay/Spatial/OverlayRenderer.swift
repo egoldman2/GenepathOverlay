@@ -9,6 +9,10 @@ final class OverlayRenderer {
         let extent: SIMD3<Float>
     }
 
+    private let plateOutlineYOffset: Float = -0.003
+    private let wellOverlayYOffset: Float = -0.001
+    private let activeOverlayAlpha: CGFloat = 0.88
+    private let inactiveOverlayAlpha: CGFloat = 0.16
     private let estimatedTipMarkerRadius: Float = 0.007
     private let overlayAccentColor = UIColor(red: 0.04, green: 0.52, blue: 1.0, alpha: 0.96)
     private let overlayAccentGlowColor = UIColor(red: 0.20, green: 0.62, blue: 1.0, alpha: 0.92)
@@ -65,14 +69,20 @@ final class OverlayRenderer {
         trackingSnapshot: TrackingSnapshot,
         mapper: CoordinateMapper,
         highlightedCoordinates: [PlateID: Coordinate] = [:],
-        showTestPlateModel: Bool = false
+        showTestPlateModel: Bool = false,
+        isTipAdjustmentActive: Bool = false,
+        isTipEstimateFrozen: Bool = false
     ) {
+        let selectedPlate = highlightedCoordinates.keys.first
+
         for plate in PlateID.allCases {
             guard let plateEntity = plateEntities[plate] else { continue }
             let anchorState = trackingSnapshot.plateAnchors[plate]
+            let isSelectedPlate = selectedPlate == nil || selectedPlate == plate
             let anchorTransform = anchorState?.transform ?? mapper.plateWorldTransform(for: plate)
             plateEntity.transform = Transform(matrix: anchorTransform)
             plateEntity.isEnabled = anchorState != nil || highlightedCoordinates[plate] != nil
+            updateOverlayOpacity(for: plate, alpha: isSelectedPlate ? activeOverlayAlpha : inactiveOverlayAlpha)
             updateOutline(
                 for: plate,
                 center: anchorState?.localBoundsCenter ?? mapper.plateOutlineCenter(for: plate),
@@ -86,12 +96,28 @@ final class OverlayRenderer {
             )
             updateHighlightedWell(
                 for: plate,
-                coordinate: highlightedCoordinates[plate]
+                coordinate: isSelectedPlate ? highlightedCoordinates[plate] : nil
             )
         }
 
         updateTestPlateVisibility(isVisible: showTestPlateModel)
-        updateEstimatedTipMarker(using: trackingSnapshot)
+        updateEstimatedTipMarker(
+            using: trackingSnapshot,
+            isTipAdjustmentActive: isTipAdjustmentActive,
+            isTipEstimateFrozen: isTipEstimateFrozen
+        )
+    }
+
+    func isEstimatedTipInteractionEntity(_ entity: Entity) -> Bool {
+        var current: Entity? = entity
+        while let candidate = current {
+            if candidate.name == "estimated-pipette-tip" || candidate.name.hasPrefix("estimated-pipette-tip-") {
+                return true
+            }
+            current = candidate.parent
+        }
+
+        return false
     }
 
     private func installTestPlateContainerIfNeeded() {
@@ -116,19 +142,27 @@ final class OverlayRenderer {
         let marker = Entity()
         marker.name = "estimated-pipette-tip"
         marker.isEnabled = false
+        marker.components.set(InputTargetComponent())
+        marker.components.set(CollisionComponent(shapes: [.generateSphere(radius: estimatedTipMarkerRadius * 2.2)]))
 
         let sphere = ModelEntity(
             mesh: .generateSphere(radius: estimatedTipMarkerRadius),
             materials: [tipMaterial]
         )
         sphere.name = "estimated-pipette-tip-dot"
+        sphere.components.set(InputTargetComponent())
+        sphere.components.set(CollisionComponent(shapes: [.generateSphere(radius: estimatedTipMarkerRadius * 2.2)]))
         marker.addChild(sphere)
 
         root.addChild(marker)
         estimatedTipEntity = marker
     }
 
-    private func updateEstimatedTipMarker(using trackingSnapshot: TrackingSnapshot) {
+    private func updateEstimatedTipMarker(
+        using trackingSnapshot: TrackingSnapshot,
+        isTipAdjustmentActive: Bool,
+        isTipEstimateFrozen: Bool
+    ) {
         guard let estimatedTipEntity else { return }
         guard let tipWorldPosition = trackingSnapshot.pipetteInput.tipWorldPosition else {
             estimatedTipEntity.isEnabled = false
@@ -207,13 +241,12 @@ final class OverlayRenderer {
         anchorRoot.addChild(visualRoot)
         plateVisualEntities[plate] = visualRoot
 
-        let outlineMaterial = SimpleMaterial(color: overlayAccentColor, roughness: 0.1, isMetallic: false)
         let thickness: Float = 0.0035
         var edges: [ModelEntity] = []
-        for index in 0..<12 {
+        for index in 0..<4 {
             let edgeEntity = ModelEntity(
                 mesh: .generateBox(size: SIMD3<Float>(repeating: thickness), cornerRadius: min(thickness * 0.25, 0.001)),
-                materials: [outlineMaterial]
+                materials: [outlineMaterial(alpha: activeOverlayAlpha)]
             )
             edgeEntity.name = "\(plate.rawValue)-outline-\(index)"
             visualRoot.addChild(edgeEntity)
@@ -244,13 +277,8 @@ final class OverlayRenderer {
 
         let layout = mapper.plateLayout
         let ringRadius = layout.wellHighlightRadius
-        let ringThickness = max(ringRadius * 0.18, 0.0008)
         let wellHeight = max(layout.wellHighlightHeight * 0.28, 0.0006)
-        let inactiveMaterial = SimpleMaterial(
-            color: UIColor.white.withAlphaComponent(plate == .source ? 0.16 : 0.08),
-            roughness: 0.18,
-            isMetallic: false
-        )
+        let inactiveMaterial = wellMaterial(alpha: activeOverlayAlpha)
 
         let mesh = MeshResource.generateCylinder(height: wellHeight, radius: ringRadius)
 
@@ -258,10 +286,9 @@ final class OverlayRenderer {
         for coordinate in mapper.allCoordinates(for: plate) {
             let wellEntity = Entity()
             wellEntity.name = "\(plate.rawValue)-well-\(coordinate.well)"
-            wellEntity.position = coordinate.normalizedPosition
+            wellEntity.position = displayPosition(for: coordinate)
 
             let cap = ModelEntity(mesh: mesh, materials: [inactiveMaterial])
-            cap.position.y = ringThickness * 0.5
             wellEntity.addChild(cap)
             group.addChild(wellEntity)
             plateWells[coordinate.well] = wellEntity
@@ -276,52 +303,22 @@ final class OverlayRenderer {
         let root = Entity()
         root.name = "\(plate.rawValue)-highlighted-well"
 
-        let haloMaterial = SimpleMaterial(
-            color: overlayAccentSoftColor,
-            roughness: 0.02,
-            isMetallic: false
-        )
-        let glowMaterial = SimpleMaterial(
-            color: overlayAccentGlowColor,
-            roughness: 0.02,
-            isMetallic: false
-        )
-        let beamMaterial = SimpleMaterial(
-            color: overlayWhiteBeamColor,
-            roughness: 0.01,
-            isMetallic: false
-        )
+        let haloMaterial = highlightSoftMaterial(alpha: activeOverlayAlpha)
+        let glowMaterial = highlightGlowMaterial(alpha: activeOverlayAlpha)
         let halo = ModelEntity(
-            mesh: .generateCylinder(height: layout.wellHighlightHeight * 0.9, radius: layout.wellHighlightRadius * 1.9),
+            mesh: .generateCylinder(height: layout.wellHighlightHeight * 0.35, radius: layout.wellHighlightRadius * 2.15),
             materials: [haloMaterial]
         )
-        halo.position.y = layout.wellHighlightHeight * 0.45
         root.addChild(halo)
 
         let puck = ModelEntity(
-            mesh: .generateCylinder(height: layout.wellHighlightHeight * 1.4, radius: layout.wellHighlightRadius * 1.2),
+            mesh: .generateCylinder(height: layout.wellHighlightHeight * 0.45, radius: layout.wellHighlightRadius * 1.35),
             materials: [glowMaterial]
         )
-        puck.position.y = layout.wellHighlightHeight * 0.7
         root.addChild(puck)
 
-        let beamHeight = max(layout.wellHighlightHeight * 10, 0.04)
-        let beam = ModelEntity(
-            mesh: .generateBox(
-                size: SIMD3<Float>(layout.wellHighlightRadius * 0.18, beamHeight, layout.wellHighlightRadius * 0.18),
-                cornerRadius: layout.wellHighlightRadius * 0.08
-            ),
-            materials: [beamMaterial]
-        )
-        beam.position.y = beamHeight * 0.5 + layout.wellHighlightHeight * 1.4
-        root.addChild(beam)
-
-        let beacon = ModelEntity(
-            mesh: .generateSphere(radius: layout.wellHighlightRadius * 0.85),
-            materials: [glowMaterial]
-        )
-        beacon.position.y = beamHeight + layout.wellHighlightHeight * 1.9
-        root.addChild(beacon)
+        let ring = makeTargetRing(radius: layout.wellHighlightRadius * 2.4, thickness: layout.wellHighlightRadius * 0.28, material: glowMaterial)
+        root.addChild(ring)
 
         return root
     }
@@ -329,7 +326,7 @@ final class OverlayRenderer {
     private func updateWellOverlayHeight(for plate: PlateID, center: SIMD3<Float>, extent: SIMD3<Float>, mapper: CoordinateMapper) {
         let topSurfaceY = center.y + extent.y * 0.5
         let baseYOffset = mapper.plateLayout.wellYOffset
-        let yAdjustment = topSurfaceY - baseYOffset
+        let yAdjustment = topSurfaceY + wellOverlayYOffset - baseYOffset
 
         wellGroupEntities[plate]?.position.y = yAdjustment
         highlightedWellEntities[plate]?.position.y = yAdjustment
@@ -356,7 +353,7 @@ final class OverlayRenderer {
 
         highlightedWellNames[plate] = coordinate.well
         highlightEntity.isEnabled = true
-        highlightEntity.position = coordinate.normalizedPosition
+        highlightEntity.position = displayPosition(for: coordinate)
 
         if plate == .source {
             wellEntities[plate]?[coordinate.well]?.isEnabled = false
@@ -364,13 +361,14 @@ final class OverlayRenderer {
     }
 
     private func updateOutline(for plate: PlateID, center: SIMD3<Float>, extent: SIMD3<Float>) {
-        guard let edges = outlineEdgeEntities[plate], edges.count == 12 else { return }
+        guard let edges = outlineEdgeEntities[plate], edges.count == 4 else { return }
 
         let minimumExtent = SIMD3<Float>(0.04, 0.004, 0.03)
         let clampedExtent = simd_max(extent, minimumExtent)
         let thickness = min(max(min(clampedExtent.x, clampedExtent.z) * 0.025, 0.0015), 0.004)
         let half = clampedExtent * 0.5
-        let nextState = OutlineState(center: center, extent: clampedExtent)
+        let outlineCenter = center + SIMD3<Float>(0, plateOutlineYOffset, 0)
+        let nextState = OutlineState(center: outlineCenter, extent: clampedExtent)
 
         if let previousState = outlineStates[plate],
            simd_distance(previousState.center, nextState.center) < 0.0005,
@@ -380,23 +378,78 @@ final class OverlayRenderer {
         outlineStates[plate] = nextState
 
         let edgeDefinitions: [(meshSize: SIMD3<Float>, position: SIMD3<Float>)] = [
-            (SIMD3<Float>(clampedExtent.x, thickness, thickness), center + SIMD3<Float>(0, half.y, half.z)),
-            (SIMD3<Float>(clampedExtent.x, thickness, thickness), center + SIMD3<Float>(0, half.y, -half.z)),
-            (SIMD3<Float>(clampedExtent.x, thickness, thickness), center + SIMD3<Float>(0, -half.y, half.z)),
-            (SIMD3<Float>(clampedExtent.x, thickness, thickness), center + SIMD3<Float>(0, -half.y, -half.z)),
-            (SIMD3<Float>(thickness, clampedExtent.y, thickness), center + SIMD3<Float>(half.x, 0, half.z)),
-            (SIMD3<Float>(thickness, clampedExtent.y, thickness), center + SIMD3<Float>(half.x, 0, -half.z)),
-            (SIMD3<Float>(thickness, clampedExtent.y, thickness), center + SIMD3<Float>(-half.x, 0, half.z)),
-            (SIMD3<Float>(thickness, clampedExtent.y, thickness), center + SIMD3<Float>(-half.x, 0, -half.z)),
-            (SIMD3<Float>(thickness, thickness, clampedExtent.z), center + SIMD3<Float>(half.x, half.y, 0)),
-            (SIMD3<Float>(thickness, thickness, clampedExtent.z), center + SIMD3<Float>(half.x, -half.y, 0)),
-            (SIMD3<Float>(thickness, thickness, clampedExtent.z), center + SIMD3<Float>(-half.x, half.y, 0)),
-            (SIMD3<Float>(thickness, thickness, clampedExtent.z), center + SIMD3<Float>(-half.x, -half.y, 0)),
+            (SIMD3<Float>(clampedExtent.x, thickness, thickness), outlineCenter + SIMD3<Float>(0, half.y, half.z)),
+            (SIMD3<Float>(clampedExtent.x, thickness, thickness), outlineCenter + SIMD3<Float>(0, half.y, -half.z)),
+            (SIMD3<Float>(thickness, thickness, clampedExtent.z), outlineCenter + SIMD3<Float>(half.x, half.y, 0)),
+            (SIMD3<Float>(thickness, thickness, clampedExtent.z), outlineCenter + SIMD3<Float>(-half.x, half.y, 0))
         ]
 
         for (edge, definition) in zip(edges, edgeDefinitions) {
             edge.model?.mesh = .generateBox(size: definition.meshSize, cornerRadius: min(thickness * 0.25, 0.001))
             edge.position = definition.position
         }
+    }
+
+    private func updateOverlayOpacity(for plate: PlateID, alpha: CGFloat) {
+        outlineEdgeEntities[plate]?.forEach { $0.model?.materials = [outlineMaterial(alpha: alpha)] }
+        wellEntities[plate]?.values.forEach { wellEntity in
+            wellEntity.children.compactMap { $0 as? ModelEntity }.forEach { $0.model?.materials = [wellMaterial(alpha: alpha)] }
+        }
+        highlightedWellEntities[plate]?.children.compactMap { $0 as? ModelEntity }.forEach { entity in
+            entity.model?.materials = [highlightGlowMaterial(alpha: alpha)]
+        }
+    }
+
+    private func displayPosition(for coordinate: Coordinate) -> SIMD3<Float> {
+        guard coordinate.plate == .destination else {
+            return coordinate.normalizedPosition
+        }
+
+        return SIMD3<Float>(
+            -coordinate.normalizedPosition.x,
+            coordinate.normalizedPosition.y,
+            -coordinate.normalizedPosition.z
+        )
+    }
+
+    private func makeTargetRing(radius: Float, thickness: Float, material: SimpleMaterial) -> Entity {
+        let root = Entity()
+        let diameter = radius * 2
+        let segmentLength = max(diameter - thickness, thickness)
+        let segmentHeight = max(thickness * 0.45, 0.0006)
+        let cornerRadius = min(thickness * 0.3, 0.001)
+        let definitions: [(size: SIMD3<Float>, position: SIMD3<Float>)] = [
+            (SIMD3<Float>(segmentLength, segmentHeight, thickness), SIMD3<Float>(0, 0, radius)),
+            (SIMD3<Float>(segmentLength, segmentHeight, thickness), SIMD3<Float>(0, 0, -radius)),
+            (SIMD3<Float>(thickness, segmentHeight, segmentLength), SIMD3<Float>(radius, 0, 0)),
+            (SIMD3<Float>(thickness, segmentHeight, segmentLength), SIMD3<Float>(-radius, 0, 0))
+        ]
+
+        for definition in definitions {
+            let segment = ModelEntity(
+                mesh: .generateBox(size: definition.size, cornerRadius: cornerRadius),
+                materials: [material]
+            )
+            segment.position = definition.position
+            root.addChild(segment)
+        }
+
+        return root
+    }
+
+    private func outlineMaterial(alpha: CGFloat) -> SimpleMaterial {
+        SimpleMaterial(color: overlayAccentColor.withAlphaComponent(alpha), roughness: 0.1, isMetallic: false)
+    }
+
+    private func wellMaterial(alpha: CGFloat) -> SimpleMaterial {
+        SimpleMaterial(color: UIColor.white.withAlphaComponent(alpha * 0.18), roughness: 0.18, isMetallic: false)
+    }
+
+    private func highlightGlowMaterial(alpha: CGFloat) -> SimpleMaterial {
+        SimpleMaterial(color: overlayAccentGlowColor.withAlphaComponent(alpha), roughness: 0.02, isMetallic: false)
+    }
+
+    private func highlightSoftMaterial(alpha: CGFloat) -> SimpleMaterial {
+        SimpleMaterial(color: overlayAccentSoftColor.withAlphaComponent(alpha * 0.35), roughness: 0.02, isMetallic: false)
     }
 }
