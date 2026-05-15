@@ -17,7 +17,7 @@ struct ValidationEngine {
     ) -> ValidationResult {
         switch trackingStatus {
         case .idle, .preparing, .searching:
-            return .blocked("Tracking is not ready yet.")
+            return .blocked("Please try again.")
         case .paused(let message), .lowConfidence(let message), .unavailable(let message):
             return .blocked(message)
         case .preview, .tracking:
@@ -61,7 +61,7 @@ struct ValidationEngine {
         case .blocked(let reason):
             return ValidationFeedback(
                 tone: .warning,
-                title: "Validation Blocked",
+                title: "Could Not Detect Position",
                 detail: reason
             )
         }

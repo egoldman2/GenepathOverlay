@@ -207,6 +207,32 @@ struct SecondaryActionButton: ButtonStyle {
     }
 }
 
+struct DestructiveActionButton: ButtonStyle {
+    private let shape = Capsule()
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .fontWeight(.semibold)
+            .foregroundStyle(AppUIStyle.feedbackColor(for: .failure))
+            .padding(.horizontal, 18)
+            .padding(.vertical, 12)
+            .contentShape([.interaction, .hoverEffect], shape)
+            .background(
+                shape
+                    .fill(Color.white.opacity(configuration.isPressed ? 0.07 : 0.05))
+                    .background(
+                        shape
+                            .fill(.regularMaterial)
+                    )
+            )
+            .overlay(
+                shape
+                    .stroke(Color.white.opacity(0.12), lineWidth: 1)
+            )
+            .hoverEffect(.lift)
+    }
+}
+
 struct CompactIconButtonStyle: ButtonStyle {
     private let shape = Circle()
 

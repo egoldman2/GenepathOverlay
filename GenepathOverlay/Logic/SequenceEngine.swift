@@ -114,6 +114,13 @@ struct SequenceEngine {
         tipChangeState = nil
     }
 
+    mutating func skipToCompletion() {
+        guard stepsQueue.isEmpty == false else { return }
+        currentIndex = stepsQueue.count
+        currentPhase = .aspiration
+        tipChangeState = nil
+    }
+
     func summary() -> WorkflowSummary {
         WorkflowSummary(
             totalSteps: stepsQueue.count,

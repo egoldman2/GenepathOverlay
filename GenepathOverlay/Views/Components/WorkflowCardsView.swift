@@ -40,7 +40,7 @@ struct CompletionHeroView: View {
     @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        VStack(alignment: .center, spacing: 18) {
+        VStack(alignment: .center, spacing: 14) {
             ZStack {
                 Circle()
                     .fill(AppUIStyle.feedbackColor(for: .success).opacity(0.16))
@@ -56,17 +56,11 @@ struct CompletionHeroView: View {
                     .font(.system(size: 27, weight: .bold, design: .rounded))
                     .foregroundStyle(AppUIStyle.primaryTextColor)
                     .multilineTextAlignment(.center)
-
-                Text("The guided transfer sequence has finished successfully.")
-                    .font(.system(size: 16, weight: .regular, design: .rounded))
-                    .foregroundStyle(Color.white.opacity(0.68))
-                    .multilineTextAlignment(.center)
-                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .center)
 
             if let summary = appModel.uiState.summary {
-                VStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .center, spacing: 8) {
                     completionDetailRow(
                         title: "Source File",
                         value: appModel.uiState.importedFileName ?? "Transfer Protocol"
@@ -86,42 +80,30 @@ struct CompletionHeroView: View {
                 )
             }
 
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 12) {
-                    exportButton
-                    restartButton
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
+            VStack(spacing: 12) {
+                loadNextWorkflowButton
+                    .frame(maxWidth: .infinity, alignment: .center)
 
-                VStack(spacing: 12) {
-                    exportButton
-                    restartButton
-                }
-                .frame(maxWidth: .infinity, alignment: .center)
+                exportButton
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
-
-            Text("Export the session log or restart from CSV import.")
-                .font(.caption)
-                .foregroundStyle(Color.white.opacity(0.5))
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 12)
+        .padding(.vertical, 6)
         .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var loadNextWorkflowButton: some View {
+        Button("Load Next Workflow") {
+            appModel.restartWorkflowToCSVImport()
+        }
+        .modifier(WorkflowActionButtonLayout(width: 176, height: 48, font: .system(size: 14, weight: .semibold, design: .rounded)))
+        .buttonStyle(SecondaryActionButton())
     }
 
     private var exportButton: some View {
         Button("Export Log") {
             appModel.exportLog()
-        }
-        .modifier(WorkflowActionButtonLayout(width: 178, height: 48, font: .system(size: 14, weight: .semibold, design: .rounded)))
-        .buttonStyle(PrimaryActionButton())
-    }
-
-    private var restartButton: some View {
-        Button("Restart") {
-            appModel.restartWorkflowToCSVImport()
         }
         .modifier(WorkflowActionButtonLayout(width: 178, height: 48, font: .system(size: 14, weight: .semibold, design: .rounded)))
         .buttonStyle(SecondaryActionButton())
@@ -266,7 +248,7 @@ private struct WorkflowActionRow: View {
                                 .fill(Color.white.opacity(0.08))
                         )
 
-                    Button("Skip Eject Detection") {
+                    Button("Manual Eject") {
                         appModel.confirmTipEjectionManually()
                     }
                     .modifier(WorkflowActionButtonLayout(width: actionButtonWidth + 24, height: actionButtonHeight, font: actionButtonFont))
@@ -306,19 +288,11 @@ private struct WorkflowActionRow: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .center)
             } else {
-                HStack(spacing: 12) {
-                    Button("Check Position") {
-                        appModel.validateCurrentPhase()
-                    }
-                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
-                    .buttonStyle(PrimaryActionButton())
-
-                    Button(appModel.manualConfirmButtonTitle) {
-                        appModel.confirmCurrentPhaseManually()
-                    }
-                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
-                    .buttonStyle(SecondaryActionButton())
+                Button(appModel.manualConfirmButtonTitle) {
+                    appModel.confirmCurrentPhaseManually()
                 }
+                .modifier(WorkflowActionButtonLayout(width: actionButtonWidth + 54, height: actionButtonHeight, font: actionButtonFont))
+                .buttonStyle(DestructiveActionButton())
                 .frame(maxWidth: .infinity, alignment: .center)
             }
         case .some(.correct):

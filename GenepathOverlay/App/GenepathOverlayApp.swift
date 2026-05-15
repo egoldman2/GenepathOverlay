@@ -48,6 +48,7 @@ struct GenepathOverlayApp: App {
 
         WindowGroup(id: "workflow-settings-window") {
             WorkflowSettingsView(showsWorkflowBackButton: false)
+                .frame(width: 920, height: 680)
                 .environment(appModel)
                 .onAppear {
                     appModel.setWorkflowSettingsWindowOpen(true)

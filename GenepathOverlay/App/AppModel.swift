@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import simd
 import SwiftUI
 
 /// Maintains app-wide state and orchestrates the pipetting workflow.
@@ -19,6 +18,7 @@ class AppModel {
     private let minimumWorkflowPipettePressInterval: TimeInterval = 0.75
     private var lastHandledPipetteReleaseAt: Date?
     private var lastAcceptedPipettePressAt: Date?
+    private var sessionEventLog: [String] = []
 
     enum Screen {
         case home
@@ -311,7 +311,7 @@ class AppModel {
 
         switch tipChangeState {
         case .awaitingEjection:
-            return "Press and release the pipette eject button to remove the used tip. If detection misses it, use the skip button to continue manually."
+            return "Press and release the pipette eject button to remove the used tip. If detection misses it, use manual eject to continue."
         case .awaitingReplacement:
             return "Attach a fresh tip, then continue to aspirate \(formattedVolume(currentStep.volume)) from source \(currentStep.source.well)."
         case .none:
@@ -363,6 +363,7 @@ class AppModel {
     func startSession() {
         trackingManager.resetPipetteCalibration(keepSelectedHand: false)
         syncTrackingSnapshot()
+        sessionEventLog.removeAll()
         pipetteCalibrationOpenedFromSettings = false
         currentScreen = .loadProtocol
     }
@@ -438,12 +439,38 @@ class AppModel {
         uiState.prepareForLaunch()
         trackingManager.clearDetection()
         syncTrackingSnapshot()
+        sessionEventLog.removeAll()
         lastHandledPipetteReleaseAt = pipetteInputState.pressEndedAt
         lastAcceptedPipettePressAt = nil
         pipetteCalibrationOpenedFromSettings = false
         isStepQueueWindowOpen = false
         isWorkflowSettingsWindowOpen = false
         currentScreen = .loadProtocol
+    }
+
+    func restartCurrentWorkflowRun() {
+        guard sequenceEngine.totalSteps > 0 else { return }
+
+        sequenceEngine.restartCurrentRun()
+        uiState.prepareForLaunch()
+        trackingManager.clearDetection()
+        syncTrackingSnapshot()
+        sessionEventLog.removeAll()
+        lastHandledPipetteReleaseAt = pipetteInputState.pressEndedAt
+        lastAcceptedPipettePressAt = nil
+        pipetteCalibrationOpenedFromSettings = false
+        updateWorkflowPresentation()
+        currentScreen = .workflow
+    }
+
+    func skipWorkflowToCompletion() {
+        guard sequenceEngine.totalSteps > 0 else { return }
+
+        trackingManager.clearDetection()
+        sequenceEngine.skipToCompletion()
+        syncTrackingSnapshot()
+        updateWorkflowPresentation()
+        currentScreen = .workflow
     }
 
     func beginWorkflow() {
@@ -537,7 +564,7 @@ class AppModel {
         syncTrackingSnapshot()
 
         let result = validationEngine.validate(
-            detectedPose: detectedPoseForValidation(expectedCoordinate: currentStep.coordinate(for: currentPhase)),
+            detectedPose: trackingSnapshot.detectedToolPose,
             expectedCoordinate: currentStep.coordinate(for: currentPhase),
             trackingStatus: trackingSnapshot.status
         )
@@ -549,27 +576,6 @@ class AppModel {
 
         uiState.setValidationResult(result, feedback: feedback)
         return result
-    }
-
-    private func detectedPoseForValidation(expectedCoordinate: Coordinate) -> DetectedToolPose? {
-        if let tipWorldPosition = trackingSnapshot.pipetteInput.tipWorldPosition,
-           let plateAnchor = trackingSnapshot.plateAnchors[expectedCoordinate.plate] {
-            let localTipVector = simd_inverse(plateAnchor.transform) * SIMD4<Float>(tipWorldPosition, 1)
-            let projectedLocalPosition = SIMD3<Float>(
-                localTipVector.x,
-                expectedCoordinate.normalizedPosition.y,
-                localTipVector.z
-            )
-            let tipConfidence = max(trackingSnapshot.pipetteInput.tipConfidence, 0.30)
-
-            return DetectedToolPose(
-                plate: expectedCoordinate.plate,
-                position: projectedLocalPosition,
-                confidence: min(plateAnchor.confidence, tipConfidence)
-            )
-        }
-
-        return trackingSnapshot.detectedToolPose
     }
 
     func retryValidation() {
@@ -590,6 +596,7 @@ class AppModel {
     func confirmTipEjectionManually() {
         guard tipChangeState == .awaitingEjection else { return }
 
+        appendSessionEvent("manualTipEjectConfirmedAt=\(Date().formatted(date: .abbreviated, time: .shortened))")
         sequenceEngine.confirmTipEjection()
         trackingManager.clearDetection()
         syncTrackingSnapshot()
@@ -877,6 +884,12 @@ class AppModel {
             ""
         ]
 
+        if sessionEventLog.isEmpty == false {
+            lines.append("Session events:")
+            lines.append(contentsOf: sessionEventLog)
+            lines.append("")
+        }
+
         for step in sequenceEngine.allSteps {
             let confirmedValue = step.volumeConfirmedValue.map(formattedVolume) ?? "none"
             let confirmedAt = step.volumeConfirmedAt?.formatted(date: .abbreviated, time: .shortened) ?? "not confirmed"
@@ -897,6 +910,10 @@ class AppModel {
                 detail: detail
             )
         )
+    }
+
+    private func appendSessionEvent(_ event: String) {
+        sessionEventLog.append(event)
     }
 
     private func formattedVolume(_ volume: Double) -> String {
