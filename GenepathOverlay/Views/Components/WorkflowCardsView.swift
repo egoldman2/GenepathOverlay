@@ -29,7 +29,10 @@ struct GuidedTransferHeroView: View {
     }
 
     private var shouldShowValidationStatus: Bool {
-        appModel.uiState.validationResult != nil || appModel.uiState.errorMessage != nil
+        if case .some(.blocked) = appModel.uiState.validationResult {
+            return false
+        }
+        return appModel.uiState.validationResult != nil || appModel.uiState.errorMessage != nil
     }
 }
 
@@ -212,14 +215,39 @@ private struct WorkflowActionRow: View {
 
     var body: some View {
         if appModel.currentStep != nil {
-            ViewThatFits(in: .horizontal) {
-                actionButtons
-                VStack(alignment: .center, spacing: 12) {
-                    actionButtons
+            VStack(alignment: .center, spacing: 12) {
+                if let currentCoordinateLabel {
+                    Text(currentCoordinateLabel)
+                        .font(.system(size: 21, weight: .bold, design: .rounded))
+                        .foregroundStyle(AppUIStyle.primaryTextColor)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 12)
+                        .frame(minWidth: 160)
+                        .background(TrackingGlassBackground(cornerRadius: 24))
                 }
-                .frame(maxWidth: .infinity, alignment: .center)
+
+                ViewThatFits(in: .horizontal) {
+                    actionButtons
+                    VStack(alignment: .center, spacing: 12) {
+                        actionButtons
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .center)
         }
+    }
+
+    private var currentCoordinateLabel: String? {
+        guard appModel.tipChangeState == nil else { return nil }
+
+        if case .some(.blocked) = appModel.uiState.validationResult {
+            return nil
+        }
+
+        guard let currentStep = appModel.currentStep else { return nil }
+        let coordinate = currentStep.coordinate(for: appModel.currentPhase)
+        return coordinate.well
     }
 
     @ViewBuilder
@@ -517,21 +545,32 @@ private struct CompactRunStatusView: View {
                     .padding(.vertical, 13)
                     .background(TrackingGlassBackground(cornerRadius: 24))
 
-                VStack(alignment: .center, spacing: 5) {
-                    Text(statusTitle)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AppUIStyle.primaryTextColor)
-                        .multilineTextAlignment(.center)
+                if isBlockedValidation {
+                    ValidationStatusView()
+                } else {
+                    VStack(alignment: .center, spacing: 5) {
+                        Text(statusTitle)
+                            .font(.system(size: 18, weight: .semibold, design: .rounded))
+                            .foregroundStyle(AppUIStyle.primaryTextColor)
+                            .multilineTextAlignment(.center)
 
-                    Text(statusText)
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
+                        Text(statusText)
+                            .font(.system(size: 17, weight: .regular, design: .rounded))
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .center)
             .padding(.vertical, 6)
         }
+    }
+
+    private var isBlockedValidation: Bool {
+        if case .some(.blocked) = appModel.uiState.validationResult {
+            return true
+        }
+        return false
     }
 
     private var stageTitle: String {
