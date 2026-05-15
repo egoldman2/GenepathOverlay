@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import simd
 import SwiftUI
 
 /// Maintains app-wide state and orchestrates the pipetting workflow.
@@ -536,7 +537,7 @@ class AppModel {
         syncTrackingSnapshot()
 
         let result = validationEngine.validate(
-            detectedPose: trackingSnapshot.detectedToolPose,
+            detectedPose: detectedPoseForValidation(expectedCoordinate: currentStep.coordinate(for: currentPhase)),
             expectedCoordinate: currentStep.coordinate(for: currentPhase),
             trackingStatus: trackingSnapshot.status
         )
@@ -548,6 +549,27 @@ class AppModel {
 
         uiState.setValidationResult(result, feedback: feedback)
         return result
+    }
+
+    private func detectedPoseForValidation(expectedCoordinate: Coordinate) -> DetectedToolPose? {
+        if let tipWorldPosition = trackingSnapshot.pipetteInput.tipWorldPosition,
+           let plateAnchor = trackingSnapshot.plateAnchors[expectedCoordinate.plate] {
+            let localTipVector = simd_inverse(plateAnchor.transform) * SIMD4<Float>(tipWorldPosition, 1)
+            let projectedLocalPosition = SIMD3<Float>(
+                localTipVector.x,
+                expectedCoordinate.normalizedPosition.y,
+                localTipVector.z
+            )
+            let tipConfidence = max(trackingSnapshot.pipetteInput.tipConfidence, 0.30)
+
+            return DetectedToolPose(
+                plate: expectedCoordinate.plate,
+                position: projectedLocalPosition,
+                confidence: min(plateAnchor.confidence, tipConfidence)
+            )
+        }
+
+        return trackingSnapshot.detectedToolPose
     }
 
     func retryValidation() {

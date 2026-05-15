@@ -3,8 +3,7 @@ import simd
 
 struct PipetteHandPose: Sendable, Equatable {
     let originFromAnchorTransform: simd_float4x4
-    /// The tracked thumb point used as the hand reference. The pipette occludes
-    /// most of the hand, so tip estimation must not depend on palm/knuckle joints.
+    /// Finger-cluster reference point for the hidden pipette body.
     let gripReferencePosition: SIMD3<Float>
     let tipDirectionInHandSpace: SIMD3<Float>?
 
@@ -36,6 +35,7 @@ struct PipetteHandPose: Sendable, Equatable {
 }
 
 struct PipetteTipEstimatorProfile: Sendable, Equatable {
+    let gripReferencePositionInHandSpace: SIMD3<Float>
     let tipDirectionInHandSpace: SIMD3<Float>
     let tipLength: Float
 
@@ -45,6 +45,7 @@ struct PipetteTipEstimatorProfile: Sendable, Equatable {
 
     static func build(
         from pressProfile: PipetteCalibrationProfile,
+        gripReferencePositionInHandSpace: SIMD3<Float>,
         tipDirectionInHandSpace: SIMD3<Float>,
         tipLength: Float = 0.25
     ) -> PipetteTipEstimatorProfile? {
@@ -53,10 +54,15 @@ struct PipetteTipEstimatorProfile: Sendable, Equatable {
             return nil
         }
 
-        return build(tipDirectionInHandSpace: tipDirectionInHandSpace, tipLength: tipLength)
+        return build(
+            gripReferencePositionInHandSpace: gripReferencePositionInHandSpace,
+            tipDirectionInHandSpace: tipDirectionInHandSpace,
+            tipLength: tipLength
+        )
     }
 
     static func build(
+        gripReferencePositionInHandSpace: SIMD3<Float>,
         tipDirectionInHandSpace: SIMD3<Float>,
         tipLength: Float = 0.25
     ) -> PipetteTipEstimatorProfile? {
@@ -66,6 +72,7 @@ struct PipetteTipEstimatorProfile: Sendable, Equatable {
         }
 
         return PipetteTipEstimatorProfile(
+            gripReferencePositionInHandSpace: gripReferencePositionInHandSpace,
             tipDirectionInHandSpace: tipDirectionInHandSpace / sqrt(directionLengthSquared),
             tipLength: tipLength
         )
@@ -74,17 +81,16 @@ struct PipetteTipEstimatorProfile: Sendable, Equatable {
 
 struct PipetteTipEstimator: Sendable {
     private let smoothingAlpha: Float
-    private let maximumFrameStep: Float
+    private let snapDistance: Float
     private(set) var profile: PipetteTipEstimatorProfile?
     private var filteredTipPosition: SIMD3<Float>?
 
     init(
-        smoothingSampleCount: Int = 4,
-        smoothingAlpha: Float = 0.45,
-        maximumFrameStep: Float = 0.012
+        smoothingAlpha: Float = 0.70,
+        snapDistance: Float = 0.045
     ) {
         self.smoothingAlpha = smoothingAlpha
-        self.maximumFrameStep = maximumFrameStep
+        self.snapDistance = snapDistance
     }
 
     mutating func reset() {
@@ -117,10 +123,12 @@ struct PipetteTipEstimator: Sendable {
 
         let delta = rawTipPosition - previousTipPosition
         let distance = simd_length(delta)
-        let clampedRawTipPosition = distance > maximumFrameStep
-            ? previousTipPosition + normalized(delta) * maximumFrameStep
-            : rawTipPosition
-        let filtered = previousTipPosition + (clampedRawTipPosition - previousTipPosition) * smoothingAlpha
+        if distance >= snapDistance {
+            filteredTipPosition = rawTipPosition
+            return rawTipPosition
+        }
+
+        let filtered = previousTipPosition + delta * smoothingAlpha
 
         filteredTipPosition = filtered
         return filtered
