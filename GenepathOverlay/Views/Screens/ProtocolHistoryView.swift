@@ -25,10 +25,10 @@ struct ProtocolHistoryView: View {
                         SetupProgressIndicator(currentStep: 1, totalSteps: 4)
                     }
 
-                    Text("Protocol history")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-
-                    AppSubtitleText("Select a recent transfer protocol to review it again without browsing files.")
+                    AppScreenHeader(
+                        title: "Protocol history",
+                        subtitle: "Select a recent transfer protocol to review it again without browsing files."
+                    )
 
                     if appModel.protocolHistory.isEmpty {
                         EmptyProtocolHistoryCard()
@@ -49,6 +49,8 @@ struct ProtocolHistoryView: View {
                         Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(AppUIStyle.feedbackColor(for: .failure))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
             }
@@ -151,7 +153,7 @@ private struct HistoryCardButtonStyle: ButtonStyle {
 
 private struct EmptyProtocolHistoryCard: View {
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .center, spacing: 12) {
             Image(systemName: "clock.arrow.circlepath")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
@@ -163,10 +165,11 @@ private struct EmptyProtocolHistoryCard: View {
             Text("Import a CSV once, then it will appear here for quick access during testing.")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
         }
         .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, alignment: .center)
         .background(HistoryGlassBackground())
     }
 }

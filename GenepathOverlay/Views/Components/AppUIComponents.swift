@@ -98,6 +98,23 @@ struct AppSubtitleText: View {
     }
 }
 
+struct AppScreenHeader: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(title)
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .multilineTextAlignment(.center)
+
+            AppSubtitleText(subtitle)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+}
+
 struct SetupProgressIndicator: View {
     let currentStep: Int
     let totalSteps: Int

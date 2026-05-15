@@ -27,10 +27,10 @@ struct LoadProtocolView: View {
                         SetupProgressIndicator(currentStep: 1, totalSteps: 4)
                     }
 
-                    Text("Load a transfer protocol")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-
-                    AppSubtitleText("Select an existing CSV file or browse files to begin. File should contain source and destination well coordinates.")
+                    AppScreenHeader(
+                        title: "Load a transfer protocol",
+                        subtitle: "Select an existing CSV file or browse files to begin. File should contain source and destination well coordinates."
+                    )
 
                     HStack(spacing: 12) {
                         Button {
@@ -47,11 +47,14 @@ struct LoadProtocolView: View {
                         }
                         .buttonStyle(PrimaryActionButton())
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
 
                     if let errorMessage = appModel.uiState.errorMessage {
                         Text(errorMessage)
                             .font(.footnote)
                             .foregroundStyle(AppUIStyle.feedbackColor(for: .failure))
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity, alignment: .center)
                     }
                 }
             }

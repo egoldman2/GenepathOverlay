@@ -19,6 +19,19 @@ struct GenepathOverlayApp: App {
         }
         .defaultSize(width: 820, height: 620)
         .windowResizability(.contentSize)
+        .commands {
+            CommandMenu("Pipette") {
+                Button("Record Plunger Press") {
+                    appModel.recordExternalPipetteButtonRelease(.plunger)
+                }
+                .keyboardShortcut("p", modifiers: [])
+
+                Button("Record Tip Eject Press") {
+                    appModel.recordExternalPipetteButtonRelease(.tipEject)
+                }
+                .keyboardShortcut("e", modifiers: [])
+            }
+        }
 
         WindowGroup(id: "step-queue-window") {
             StepQueueWindowView()

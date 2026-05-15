@@ -74,10 +74,10 @@ struct WorkflowSettingsView: View {
 
     private var settingsMenu: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Settings")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-
-            AppSubtitleText("Choose a setting to adjust for the guided run.")
+            AppScreenHeader(
+                title: "Settings",
+                subtitle: "Choose a setting to adjust for the guided run."
+            )
 
             VStack(alignment: .leading, spacing: 10) {
                 SettingsOptionRow(
@@ -112,10 +112,10 @@ struct WorkflowSettingsView: View {
 
     private var trackingSettings: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Tracking and Alignment")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-
-            AppSubtitleText("Manage plate tracking and preview alignment options.")
+            AppScreenHeader(
+                title: "Tracking and Alignment",
+                subtitle: "Manage plate tracking and preview alignment options."
+            )
 
             SettingsDetailCard(title: "Tracking Status", value: appModel.trackingMessage)
             SettingsDetailCard(title: "Reference Objects", value: appModel.bundledReferenceObjectsLabel)
@@ -138,21 +138,25 @@ struct WorkflowSettingsView: View {
             )
             .font(.caption)
             .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .center)
 
             if appModel.isPreviewTracking {
                 Text("Preview mode is active because live tracking assets are still being prepared.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
         }
     }
 
     private var pipetteButtonSettings: some View {
         VStack(alignment: .leading, spacing: 18) {
-            Text("Pipette Button")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
-
-            AppSubtitleText("View the current pipette input state and calibration status.")
+            AppScreenHeader(
+                title: "Pipette Button",
+                subtitle: "View the current pipette input state and calibration status."
+            )
 
             SettingsPipetteStatusCard()
 
@@ -169,6 +173,8 @@ struct WorkflowSettingsView: View {
             Text(appModel.pipetteCalibrationProgressLabel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .center)
         }
     }
 }

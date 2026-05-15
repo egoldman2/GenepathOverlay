@@ -118,6 +118,10 @@ struct PipettePressClassifier {
         var pressCount = 0
         var rawTravel: Float?
         var smoothedTravel: Float?
+        var activeButton: PipetteButtonID?
+        var releasedButton: PipetteButtonID?
+        var activeButtonSource: PipetteButtonInputSource?
+        var releasedButtonSource: PipetteButtonInputSource?
     }
 
     private let smoothingAlpha: Float
@@ -184,6 +188,10 @@ struct PipettePressClassifier {
 
         output.pressBeganAt = nil
         output.pressEndedAt = nil
+        output.activeButton = nil
+        output.releasedButton = nil
+        output.activeButtonSource = nil
+        output.releasedButtonSource = nil
         resetRuntimeState()
         return output
     }
@@ -192,10 +200,13 @@ struct PipettePressClassifier {
         travel: Float?,
         lateralError: Float? = nil,
         gripConfidence: Float,
-        timestamp: Date
+        timestamp: Date,
+        button: PipetteButtonID = .plunger
     ) -> Output {
         output.gripConfidence = gripConfidence
         output.rawTravel = travel
+        output.releasedButton = nil
+        output.releasedButtonSource = nil
 
         guard let calibration else {
             return clearSignal(at: timestamp)
@@ -205,6 +216,8 @@ struct PipettePressClassifier {
             output.smoothedTravel = nil
             pressCandidateBeganAt = nil
             releaseCandidateBeganAt = nil
+            output.activeButton = output.isPressed ? output.activeButton : nil
+            output.activeButtonSource = output.isPressed ? output.activeButtonSource : nil
             return output
         }
 
@@ -250,6 +263,10 @@ struct PipettePressClassifier {
             output.isPressed = true
             output.pressBeganAt = timestamp
             output.pressCount += 1
+            output.activeButton = button
+            output.releasedButton = nil
+            output.activeButtonSource = .handTracking
+            output.releasedButtonSource = nil
             isArmed = false
             pressPeakTravel = adjustedTravel
             pressCandidateBeganAt = nil
@@ -339,6 +356,10 @@ struct PipettePressClassifier {
            timestamp.timeIntervalSince(releaseStartedAt) >= releaseDwellDuration {
             output.isPressed = false
             output.pressEndedAt = timestamp
+            output.releasedButton = output.activeButton
+            output.releasedButtonSource = output.activeButtonSource
+            output.activeButton = nil
+            output.activeButtonSource = nil
             cooldownUntil = timestamp.addingTimeInterval(cooldownDuration)
             isArmed = false
             releaseCandidateBeganAt = nil

@@ -28,14 +28,15 @@ struct ProtocolReviewView: View {
                         SetupProgressIndicator(currentStep: 2, totalSteps: 4)
                     }
 
-                    Text("Review protocol before starting")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-
-                    AppSubtitleText("Check the loaded file and transfer list before continuing.")
+                    AppScreenHeader(
+                        title: "Review protocol before starting",
+                        subtitle: "Check the loaded file and transfer list before continuing."
+                    )
 
                     VStack(alignment: .leading, spacing: 14) {
                         Text("Run summary")
                             .font(.headline)
+                            .frame(maxWidth: .infinity, alignment: .center)
 
                         ReviewFileSummary(
                             title: "Loaded File",
@@ -82,6 +83,7 @@ struct ProtocolReviewView: View {
                         }
                         .buttonStyle(PrimaryActionButton())
                     }
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
         }
@@ -145,7 +147,7 @@ private struct ReviewFileSummary: View {
     let value: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .center, spacing: 4) {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
@@ -153,8 +155,9 @@ private struct ReviewFileSummary: View {
             Text(value)
                 .font(.headline)
                 .foregroundStyle(AppUIStyle.primaryTextColor)
+                .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, 2)
+        .frame(maxWidth: .infinity, alignment: .center)
         .padding(.bottom, 2)
     }
 }

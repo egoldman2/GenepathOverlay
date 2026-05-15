@@ -7,7 +7,6 @@
 
 import Foundation
 import SwiftUI
-import simd
 
 /// Maintains app-wide state and orchestrates the pipetting workflow.
 @MainActor
@@ -192,12 +191,21 @@ class AppModel {
         pipetteInputState.calibration.step == .adjustingTip
     }
 
+    var isCalibrationTipAttached: Bool {
+        pipetteInputState.calibration.isTipAttachmentConfirmed
+    }
+
+    var isPipetteTipEstimateFrozen: Bool {
+        pipetteInputState.isTipEstimateFrozen
+    }
+
     var isPipettePressed: Bool {
         pipetteInputState.isPressed
     }
 
     var pipettePressLabel: String {
-        pipetteInputState.isPressed ? "Pressed" : "Idle"
+        guard pipetteInputState.isPressed else { return "Idle" }
+        return "\(pipetteInputState.activeButton?.title ?? "Pipette") pressed"
     }
 
     var pipetteGripConfidenceLabel: String {
@@ -219,14 +227,16 @@ class AppModel {
 
     var lastPipetteEventLabel: String {
         if let ended = pipetteInputState.pressEndedAt {
-            return "Released \(ended.formatted(date: .omitted, time: .standard))"
+            let button = pipetteInputState.releasedButton?.title ?? "Pipette"
+            return "\(button) released \(ended.formatted(date: .omitted, time: .standard))"
         }
 
         if let began = pipetteInputState.pressBeganAt {
-            return "Pressed \(began.formatted(date: .omitted, time: .standard))"
+            let button = pipetteInputState.activeButton?.title ?? "Pipette"
+            return "\(button) pressed \(began.formatted(date: .omitted, time: .standard))"
         }
 
-        return "No thumb presses recorded yet"
+        return "No pipette button presses recorded yet"
     }
 
     var bundledReferenceObjectsLabel: String {
@@ -300,7 +310,7 @@ class AppModel {
 
         switch tipChangeState {
         case .awaitingEjection:
-            return "Press and release the pipette eject button to remove the used tip. The app will detect the release before allowing a fresh tip."
+            return "Press and release the pipette eject button to remove the used tip. If detection misses it, use the skip button to continue manually."
         case .awaitingReplacement:
             return "Attach a fresh tip, then continue to aspirate \(formattedVolume(currentStep.volume)) from source \(currentStep.source.well)."
         case .none:
@@ -420,6 +430,19 @@ class AppModel {
 
     func leavePipetteCalibration() {
         currentScreen = pipetteCalibrationOpenedFromSettings ? .workflowSettings : .operatorChecklist
+    }
+
+    func restartWorkflowToCSVImport() {
+        sequenceEngine.reset()
+        uiState.prepareForLaunch()
+        trackingManager.clearDetection()
+        syncTrackingSnapshot()
+        lastHandledPipetteReleaseAt = pipetteInputState.pressEndedAt
+        lastAcceptedPipettePressAt = nil
+        pipetteCalibrationOpenedFromSettings = false
+        isStepQueueWindowOpen = false
+        isWorkflowSettingsWindowOpen = false
+        currentScreen = .loadProtocol
     }
 
     func beginWorkflow() {
@@ -542,6 +565,15 @@ class AppModel {
         updateWorkflowPresentation()
     }
 
+    func confirmTipEjectionManually() {
+        guard tipChangeState == .awaitingEjection else { return }
+
+        sequenceEngine.confirmTipEjection()
+        trackingManager.clearDetection()
+        syncTrackingSnapshot()
+        updateWorkflowPresentation()
+    }
+
     func confirmCurrentStepVolume() {
         guard sequenceEngine.confirmVolumeForCurrentStep() else { return }
 
@@ -606,6 +638,11 @@ class AppModel {
         syncTrackingSnapshot()
     }
 
+    func confirmCalibrationTipAttached() {
+        trackingManager.confirmCalibrationTipAttached()
+        syncTrackingSnapshot()
+    }
+
     func startRestCalibrationCapture() {
         trackingManager.startRestCalibrationCapture()
         syncTrackingSnapshot()
@@ -616,8 +653,8 @@ class AppModel {
         syncTrackingSnapshot()
     }
 
-    func nudgePipetteTipOffset(_ worldDelta: SIMD3<Float>) {
-        trackingManager.nudgeManualPipetteTipOffset(worldDelta: worldDelta)
+    func toggleFrozenPipetteTipEstimate() {
+        trackingManager.toggleFrozenManualPipetteTipEstimate()
         syncTrackingSnapshot()
     }
 
@@ -633,6 +670,11 @@ class AppModel {
 
     func resetPipetteCalibration() {
         trackingManager.resetPipetteCalibration()
+        syncTrackingSnapshot()
+    }
+
+    func recordExternalPipetteButtonRelease(_ button: PipetteButtonID) {
+        trackingManager.recordExternalPipetteButtonRelease(button)
         syncTrackingSnapshot()
     }
 
@@ -692,14 +734,25 @@ class AppModel {
             return
         }
 
-        lastAcceptedPipettePressAt = releaseAt
+        let releasedButton = trackingSnapshot.pipetteInput.releasedButton ?? .plunger
+        let isExternalButtonEvent = trackingSnapshot.pipetteInput.releasedButtonSource == .externalButton
 
         if tipChangeState == .awaitingEjection {
-            handleTipEjectionPipettePress()
+            guard releasedButton == .tipEject else {
+                blockCurrentAction(
+                    title: "Use Tip Eject",
+                    detail: "Press and release the pipette eject button to confirm tip removal."
+                )
+                return
+            }
+
+            lastAcceptedPipettePressAt = releaseAt
+            handleTipEjectionPipettePress(isExternalButtonEvent: isExternalButtonEvent)
             return
         }
 
         guard isAwaitingTipChange == false else { return }
+        guard releasedButton == .plunger else { return }
 
         guard isAwaitingVolumeVerification == false else {
             blockCurrentAction(
@@ -709,7 +762,8 @@ class AppModel {
             return
         }
 
-        handleAutoWorkflowPipettePress()
+        lastAcceptedPipettePressAt = releaseAt
+        handleAutoWorkflowPipettePress(isExternalButtonEvent: isExternalButtonEvent)
     }
 
     private func isStableCompletedPipettePress(releaseAt: Date) -> Bool {
@@ -728,8 +782,8 @@ class AppModel {
         return releaseAt.timeIntervalSince(lastAcceptedPipettePressAt) >= minimumWorkflowPipettePressInterval
     }
 
-    private func handleTipEjectionPipettePress() {
-        guard pipetteInputState.calibration.isComplete else {
+    private func handleTipEjectionPipettePress(isExternalButtonEvent: Bool = false) {
+        guard isExternalButtonEvent || pipetteInputState.calibration.isComplete else {
             let result = ValidationResult.blocked("Tip eject press detected, but calibration is not complete.")
             let feedback = ValidationFeedback(
                 tone: .warning,
@@ -740,7 +794,7 @@ class AppModel {
             return
         }
 
-        guard case .ready = pipetteInputState.trackingStatus else {
+        guard isExternalButtonEvent || pipetteInputState.trackingStatus == .ready else {
             let result = ValidationResult.blocked("Tip eject press detected, but hand tracking is not ready.")
             let feedback = ValidationFeedback(
                 tone: .warning,
@@ -757,8 +811,8 @@ class AppModel {
         updateWorkflowPresentation()
     }
 
-    private func handleAutoWorkflowPipettePress() {
-        guard pipetteInputState.calibration.isComplete else {
+    private func handleAutoWorkflowPipettePress(isExternalButtonEvent: Bool = false) {
+        guard isExternalButtonEvent || pipetteInputState.calibration.isComplete else {
             let result = ValidationResult.blocked("Pipette press detected, but calibration is not complete. Use manual confirm if needed.")
             let feedback = ValidationFeedback(
                 tone: .warning,
@@ -769,7 +823,7 @@ class AppModel {
             return
         }
 
-        guard case .ready = pipetteInputState.trackingStatus else {
+        guard isExternalButtonEvent || pipetteInputState.trackingStatus == .ready else {
             let result = ValidationResult.blocked("Pipette press detected, but hand tracking is not ready. Use manual confirm if needed.")
             let feedback = ValidationFeedback(
                 tone: .warning,

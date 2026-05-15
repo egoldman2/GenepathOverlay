@@ -49,8 +49,19 @@ struct PipetteTipEstimatorProfile: Sendable, Equatable {
         tipLength: Float = 0.25
     ) -> PipetteTipEstimatorProfile? {
         let lengthSquared = simd_length_squared(pressProfile.pressDirection)
+        guard lengthSquared > 0.000001 else {
+            return nil
+        }
+
+        return build(tipDirectionInHandSpace: tipDirectionInHandSpace, tipLength: tipLength)
+    }
+
+    static func build(
+        tipDirectionInHandSpace: SIMD3<Float>,
+        tipLength: Float = 0.25
+    ) -> PipetteTipEstimatorProfile? {
         let directionLengthSquared = simd_length_squared(tipDirectionInHandSpace)
-        guard lengthSquared > 0.000001, directionLengthSquared > 0.000001 else {
+        guard directionLengthSquared > 0.000001 else {
             return nil
         }
 
@@ -95,7 +106,7 @@ struct PipetteTipEstimator: Sendable {
         guard let profile else { return nil }
 
         let gripWorldPosition = handPose.worldPosition(forAnchorPosition: handPose.gripReferencePosition)
-        let anchorTipDirection = profile.tipDirectionInHandSpace
+        let anchorTipDirection = handPose.tipDirectionInHandSpace ?? profile.tipDirectionInHandSpace
         let tipDirection = handPose.worldDirection(forAnchorDirection: anchorTipDirection)
         let rawTipPosition = gripWorldPosition + normalized(tipDirection) * profile.tipLength
 

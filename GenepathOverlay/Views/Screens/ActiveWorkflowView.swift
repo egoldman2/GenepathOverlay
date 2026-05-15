@@ -12,8 +12,13 @@ struct ActiveWorkflowView: View {
     @Environment(\.openWindow) private var openWindow
     @Environment(\.dismissWindow) private var dismissWindow
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
+
     private let panelWidth: CGFloat = 460
     private let panelHeight: CGFloat = 380
+
+    private var isCompletedState: Bool {
+        appModel.uiState.summary != nil
+    }
 
     private var isLoadingState: Bool {
         switch appModel.uiState.appState {
@@ -25,27 +30,30 @@ struct ActiveWorkflowView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            topBar
-
-            if let summary = appModel.uiState.summary {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        CompletionHeroView(summary: summary)
-                        SessionSummaryCardView(summary: summary)
-                    }
+        Group {
+            if isCompletedState {
+                VStack {
+                    Spacer(minLength: 0)
+                    CompletionHeroView()
+                    Spacer(minLength: 0)
                 }
-                .scrollIndicators(.hidden)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             } else {
-                GuidedTransferHeroView(isLoadingState: isLoadingState)
-
-                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 12) {
+                    topBar
+                    GuidedTransferHeroView(isLoadingState: isLoadingState)
+                    Spacer(minLength: 0)
+                }
             }
         }
         .padding(.horizontal, 22)
-        .padding(.top, 18)
-        .padding(.bottom, 24)
-        .frame(width: panelWidth, height: panelHeight, alignment: .topLeading)
+        .padding(.top, isCompletedState ? 22 : 18)
+        .padding(.bottom, isCompletedState ? 22 : 24)
+        .frame(
+            width: panelWidth,
+            height: panelHeight,
+            alignment: isCompletedState ? .center : .topLeading
+        )
         .onAppear {
             appModel.setWorkflowScreenVisible(true)
         }
@@ -54,39 +62,42 @@ struct ActiveWorkflowView: View {
         }
     }
 
+    @ViewBuilder
     private var topBar: some View {
-        HStack(alignment: .center, spacing: 14) {
-            Button {
-                Task { @MainActor in
-                    await closeMixedRealityBeforeGoingBack()
-                    appModel.goToProtocolReview()
+        if appModel.uiState.summary != nil {
+            EmptyView()
+        } else {
+            HStack(alignment: .center, spacing: 14) {
+                Button {
+                    Task { @MainActor in
+                        await closeMixedRealityBeforeGoingBack()
+                        appModel.goToProtocolReview()
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 22, height: 22)
                 }
-            } label: {
-                Image(systemName: "chevron.left")
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 22, height: 22)
-            }
-            .buttonStyle(CompactIconButtonStyle())
-            .help("Back")
+                .buttonStyle(CompactIconButtonStyle())
+                .help("Back")
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Workflow")
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Workflow")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(.secondary)
 
-                Text(appModel.uiState.importedFileName ?? "Transfer Protocol")
-                    .font(.headline.weight(.semibold))
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.72)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+                    Text(appModel.uiState.importedFileName ?? "Transfer Protocol")
+                        .font(.headline.weight(.semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.72)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            if appModel.uiState.summary == nil {
                 toolBar
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var toolBar: some View {

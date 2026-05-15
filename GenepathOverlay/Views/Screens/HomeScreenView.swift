@@ -15,35 +15,33 @@ struct HomeScreenView: View {
             Spacer(minLength: 0)
 
             AppSetupCard {
-                HStack(alignment: .top, spacing: 22) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Vision Pro Guidance for Well Plate Workflows")
-                            .font(.system(size: 34, weight: .bold, design: .rounded))
-                            .fixedSize(horizontal: false, vertical: true)
+                AppScreenHeader(
+                    title: "Vision Pro Guidance for Well Plate Workflows",
+                    subtitle: "Guide technicians through transfer steps with mixed-reality overlays and step-by-step validation."
+                )
 
-                        AppSubtitleText("Guide technicians through transfer steps with mixed-reality overlays and step-by-step validation.")
-
-                        VStack(alignment: .leading, spacing: 12) {
-                            FeatureRow(
-                                title: "Load one protocol",
-                                detail: "Import a CSV once, then move into guided transfer mode."
-                            )
-                            FeatureRow(
-                                title: "Track the real plate",
-                                detail: "Highlight the active target well in physical space."
-                            )
-                            FeatureRow(
-                                title: "Validate each action",
-                                detail: "Confirm each transfer step before continuing."
-                            )
-                        }
-                    }
+                VStack(alignment: .leading, spacing: 12) {
+                    FeatureRow(
+                        title: "Load one protocol",
+                        detail: "Import a CSV once, then move into guided transfer mode."
+                    )
+                    FeatureRow(
+                        title: "Track the real plate",
+                        detail: "Highlight the active target well in physical space."
+                    )
+                    FeatureRow(
+                        title: "Validate each action",
+                        detail: "Confirm each transfer step before continuing."
+                    )
                 }
+                .frame(maxWidth: 480, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
 
                 Button("Start Session") {
                     appModel.startSession()
                 }
                 .buttonStyle(PrimaryActionButton())
+                .frame(maxWidth: .infinity, alignment: .center)
             }
 
             Spacer(minLength: 0)

@@ -34,145 +34,116 @@ struct GuidedTransferHeroView: View {
 }
 
 struct CompletionHeroView: View {
-    let summary: WorkflowSummary
+    @Environment(AppModel.self) private var appModel
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("Protocol completed successfully")
-                .font(.system(size: 32, weight: .bold, design: .rounded))
+        VStack(alignment: .center, spacing: 18) {
+            ZStack {
+                Circle()
+                    .fill(AppUIStyle.feedbackColor(for: .success).opacity(0.16))
+                    .frame(width: 48, height: 48)
 
-            AppSubtitleText("The guided transfer sequence has finished. Review the summary below and export the session log if needed.")
-
-            HStack(spacing: 14) {
-                DetailItemView(title: "Total Steps", value: "\(summary.totalSteps)")
-                DetailItemView(title: "Aspiration Warnings", value: "\(summary.aspirationWarnings)")
-                DetailItemView(title: "Dispense Warnings", value: "\(summary.dispenseWarnings)")
+                Image(systemName: "checkmark")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(AppUIStyle.feedbackColor(for: .success))
             }
+
+            VStack(alignment: .center, spacing: 6) {
+                Text("Protocol complete")
+                    .font(.system(size: 27, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppUIStyle.primaryTextColor)
+                    .multilineTextAlignment(.center)
+
+                Text("The guided transfer sequence has finished successfully.")
+                    .font(.system(size: 16, weight: .regular, design: .rounded))
+                    .foregroundStyle(Color.white.opacity(0.68))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+
+            if let summary = appModel.uiState.summary {
+                VStack(alignment: .center, spacing: 10) {
+                    completionDetailRow(
+                        title: "Source File",
+                        value: appModel.uiState.importedFileName ?? "Transfer Protocol"
+                    )
+                    completionDetailRow(
+                        title: "Completed",
+                        value: summary.completedAt.formatted(date: .abbreviated, time: .shortened)
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 12)
+                .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+            }
+
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 12) {
+                    exportButton
+                    restartButton
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+
+                VStack(spacing: 12) {
+                    exportButton
+                    restartButton
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
+            }
+
+            Text("Export the session log or restart from CSV import.")
+                .font(.caption)
+                .foregroundStyle(Color.white.opacity(0.5))
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(28)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .center)
+    }
+
+    private var exportButton: some View {
+        Button("Export Log") {
+            appModel.exportLog()
+        }
+        .modifier(WorkflowActionButtonLayout(width: 178, height: 48, font: .system(size: 14, weight: .semibold, design: .rounded)))
+        .buttonStyle(PrimaryActionButton())
+    }
+
+    private var restartButton: some View {
+        Button("Restart") {
+            appModel.restartWorkflowToCSVImport()
+        }
+        .modifier(WorkflowActionButtonLayout(width: 178, height: 48, font: .system(size: 14, weight: .semibold, design: .rounded)))
+        .buttonStyle(SecondaryActionButton())
+    }
+
+    private func completionDetailRow(title: String, value: String) -> some View {
+        VStack(alignment: .center, spacing: 4) {
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(Color.white.opacity(0.58))
+
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppUIStyle.primaryTextColor)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, alignment: .center)
     }
 }
 
 struct WorkflowCardView: View {
     var body: some View {
         EmptyView()
-    }
-}
-
-private struct ValidationStatusView: View {
-    @Environment(AppModel.self) private var appModel
-
-    var body: some View {
-        VStack(alignment: .center, spacing: 8) {
-            Text(appModel.uiState.validationFeedback.title)
-                .font(.headline)
-                .multilineTextAlignment(.center)
-
-            Text(appModel.uiState.validationFeedback.detail)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-
-            if let errorMessage = appModel.uiState.errorMessage {
-                Text(errorMessage)
-                    .font(.subheadline)
-                    .foregroundStyle(.red)
-                    .multilineTextAlignment(.center)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .center)
-        .padding(12)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(AppUIStyle.feedbackColor(for: appModel.uiState.validationFeedback.tone).opacity(0.12))
-        )
-    }
-}
-
-private struct CompactRunStatusView: View {
-    @Environment(AppModel.self) private var appModel
-
-    var body: some View {
-        if appModel.isAwaitingTipChange {
-            TipChangeRunStatusView(
-                title: stageTitle,
-                statusTitle: statusTitle,
-                statusText: statusText
-            )
-        } else if appModel.isAwaitingVolumeVerification {
-            VolumeCheckRunStatusView(
-                title: stageTitle,
-                statusText: statusText
-            )
-        } else {
-            VStack(alignment: .center, spacing: 12) {
-                Text(stageTitle)
-                    .font(.system(size: 24, weight: .bold, design: .rounded))
-                    .foregroundStyle(AppUIStyle.primaryTextColor)
-                    .frame(maxWidth: .infinity)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 13)
-                    .background(TrackingGlassBackground(cornerRadius: 24))
-
-                VStack(alignment: .center, spacing: 5) {
-                    Text(statusTitle)
-                        .font(.system(size: 18, weight: .semibold, design: .rounded))
-                        .foregroundStyle(AppUIStyle.primaryTextColor)
-                        .multilineTextAlignment(.center)
-
-                    Text(statusText)
-                        .font(.system(size: 17, weight: .regular, design: .rounded))
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.vertical, 6)
-        }
-    }
-
-    private var stageTitle: String {
-        if appModel.isAwaitingTipChange {
-            return "Tip Change"
-        }
-
-        if appModel.isAwaitingVolumeVerification {
-            return "Volume Check"
-        }
-
-        return appModel.currentPhase.title
-    }
-
-    private var statusTitle: String {
-        if appModel.isAwaitingTipChange {
-            return appModel.tipChangeInstructionTitle
-        }
-
-        if appModel.isAwaitingVolumeVerification {
-            return appModel.volumeVerificationInstructionTitle
-        }
-
-        return appModel.progressLabel
-    }
-
-    private var statusText: String {
-        guard appModel.currentStep != nil else {
-            return "No active transfer."
-        }
-
-        if appModel.isAwaitingTipChange {
-            return appModel.tipChangeInstructionDetail
-        }
-
-        if appModel.isAwaitingVolumeVerification {
-            return appModel.volumeVerificationInstructionDetail
-        }
-
-        if appModel.isPipettePressed {
-            return "Pipette press detected."
-        }
-
-        return "Waiting for pipette press."
     }
 }
 
@@ -243,10 +214,10 @@ private struct WorkflowActionRow: View {
         if appModel.currentStep != nil {
             ViewThatFits(in: .horizontal) {
                 actionButtons
-                VStack(alignment: .leading, spacing: 12) {
+                VStack(alignment: .center, spacing: 12) {
                     actionButtons
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
     }
@@ -256,22 +227,31 @@ private struct WorkflowActionRow: View {
         if let tipChangeState = appModel.tipChangeState {
             switch tipChangeState {
             case .awaitingEjection:
-                Text("Waiting for eject button press")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background(
-                        Capsule()
-                            .fill(Color.white.opacity(0.08))
-                    )
-                    .frame(maxWidth: .infinity, alignment: .center)
+                VStack(spacing: 12) {
+                    Text("Waiting for eject button press")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .background(
+                            Capsule()
+                                .fill(Color.white.opacity(0.08))
+                        )
+
+                    Button("Skip Eject Detection") {
+                        appModel.confirmTipEjectionManually()
+                    }
+                    .modifier(WorkflowActionButtonLayout(width: actionButtonWidth + 24, height: actionButtonHeight, font: actionButtonFont))
+                    .buttonStyle(SecondaryActionButton())
+                }
+                .frame(maxWidth: .infinity, alignment: .center)
             case .awaitingReplacement:
                 Button("Fresh Tip Attached") {
                     appModel.confirmTipReplacement()
                 }
                 .modifier(WorkflowActionButtonLayout(width: actionButtonWidth, height: actionButtonHeight, font: actionButtonFont))
                 .buttonStyle(PrimaryActionButton())
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         } else {
         switch appModel.uiState.validationResult {
@@ -482,26 +462,119 @@ struct TrackingGlassBackground: View {
     }
 }
 
-struct SessionSummaryCardView: View {
+private struct ValidationStatusView: View {
     @Environment(AppModel.self) private var appModel
 
-    let summary: WorkflowSummary
-
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text("Session summary")
+        VStack(alignment: .center, spacing: 8) {
+            Text(appModel.uiState.validationFeedback.title)
                 .font(.headline)
+                .multilineTextAlignment(.center)
 
-            Text("Completed at \(summary.completedAt.formatted(date: .abbreviated, time: .shortened))")
+            Text(appModel.uiState.validationFeedback.detail)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
-            Button("Export Log") {
-                appModel.exportLog()
+            if let errorMessage = appModel.uiState.errorMessage {
+                Text(errorMessage)
+                    .font(.subheadline)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(PrimaryActionButton())
         }
-        .padding(22)
-        .background(AppCardBackground())
+        .frame(maxWidth: .infinity, alignment: .center)
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(AppUIStyle.feedbackColor(for: appModel.uiState.validationFeedback.tone).opacity(0.12))
+        )
+    }
+}
+
+private struct CompactRunStatusView: View {
+    @Environment(AppModel.self) private var appModel
+
+    var body: some View {
+        if appModel.isAwaitingTipChange {
+            TipChangeRunStatusView(
+                title: stageTitle,
+                statusTitle: statusTitle,
+                statusText: statusText
+            )
+        } else if appModel.isAwaitingVolumeVerification {
+            VolumeCheckRunStatusView(
+                title: stageTitle,
+                statusText: statusText
+            )
+        } else {
+            VStack(alignment: .center, spacing: 12) {
+                Text(stageTitle)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundStyle(AppUIStyle.primaryTextColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 13)
+                    .background(TrackingGlassBackground(cornerRadius: 24))
+
+                VStack(alignment: .center, spacing: 5) {
+                    Text(statusTitle)
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundStyle(AppUIStyle.primaryTextColor)
+                        .multilineTextAlignment(.center)
+
+                    Text(statusText)
+                        .font(.system(size: 17, weight: .regular, design: .rounded))
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.vertical, 6)
+        }
+    }
+
+    private var stageTitle: String {
+        if appModel.isAwaitingTipChange {
+            return "Tip Change"
+        }
+
+        if appModel.isAwaitingVolumeVerification {
+            return "Volume Check"
+        }
+
+        return appModel.currentPhase.title
+    }
+
+    private var statusTitle: String {
+        if appModel.isAwaitingTipChange {
+            return appModel.tipChangeInstructionTitle
+        }
+
+        if appModel.isAwaitingVolumeVerification {
+            return appModel.volumeVerificationInstructionTitle
+        }
+
+        return appModel.progressLabel
+    }
+
+    private var statusText: String {
+        guard appModel.currentStep != nil else {
+            return "No active transfer."
+        }
+
+        if appModel.isAwaitingTipChange {
+            return appModel.tipChangeInstructionDetail
+        }
+
+        if appModel.isAwaitingVolumeVerification {
+            return appModel.volumeVerificationInstructionDetail
+        }
+
+        if appModel.isPipettePressed {
+            return "\(appModel.pipettePressLabel) detected."
+        }
+
+        return "Waiting for pipette press."
     }
 }

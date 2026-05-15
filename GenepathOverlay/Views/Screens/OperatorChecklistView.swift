@@ -41,10 +41,10 @@ struct OperatorChecklistView: View {
                         SetupProgressIndicator(currentStep: 3, totalSteps: 4)
                     }
 
-                    Text("Operator checklist")
-                        .font(.system(size: 34, weight: .bold, design: .rounded))
-
-                    AppSubtitleText("Complete each item before starting the guided run.")
+                    AppScreenHeader(
+                        title: "Operator checklist",
+                        subtitle: "Complete each item before starting the guided run."
+                    )
 
                     VStack(alignment: .leading, spacing: 14) {
                         OperatorChecklistToggleRow(
@@ -79,6 +79,7 @@ struct OperatorChecklistView: View {
                     .buttonStyle(PrimaryActionButton())
                     .disabled(!canStartRun)
                     .opacity(canStartRun ? 1.0 : 0.45)
+                    .frame(maxWidth: .infinity, alignment: .center)
                 }
             }
         }

@@ -14,6 +14,8 @@ struct UIStateManager {
     mutating func prepareForLaunch() {
         appState = .idle
         isShowingImporter = false
+        isShowingExporter = false
+        importedFileName = nil
         errorMessage = nil
         validationResult = nil
         validationFeedback = .idle
@@ -109,7 +111,7 @@ private extension TipChangeState {
     func detail(for step: Step) -> String {
         switch self {
         case .awaitingEjection:
-            return "Press and release the pipette eject button to remove the used tip before aspirating from source \(step.source.well)."
+            return "Press and release the pipette eject button to remove the used tip before aspirating from source \(step.source.well). If detection misses it, skip the check manually."
         case .awaitingReplacement:
             return "Attach a fresh tip, then confirm before aspirating from source \(step.source.well)."
         }

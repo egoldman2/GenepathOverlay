@@ -199,6 +199,25 @@ enum PipetteHandedness: String, CaseIterable, Identifiable, Sendable, Equatable 
     }
 }
 
+enum PipetteButtonID: String, Sendable, Equatable, Hashable {
+    case plunger
+    case tipEject
+
+    var title: String {
+        switch self {
+        case .plunger:
+            return "Plunger"
+        case .tipEject:
+            return "Tip Eject"
+        }
+    }
+}
+
+enum PipetteButtonInputSource: String, Sendable, Equatable {
+    case handTracking
+    case externalButton
+}
+
 enum PipetteCalibrationStep: Sendable, Equatable {
     case handNotSelected
     case waitingForHand
@@ -213,6 +232,7 @@ enum PipetteCalibrationStep: Sendable, Equatable {
 
 struct PipetteCalibrationState: Sendable, Equatable {
     var selectedHand: PipetteHandedness?
+    var isTipAttachmentConfirmed: Bool
     var step: PipetteCalibrationStep
     var restSampleCount: Int
     var pressedSampleCount: Int
@@ -224,6 +244,10 @@ struct PipetteCalibrationState: Sendable, Equatable {
     }
 
     var summary: String {
+        guard isTipAttachmentConfirmed else {
+            return "Attach a pipette tip before starting calibration."
+        }
+
         switch step {
         case .handNotSelected:
             return "Select the hand holding the pipette to begin calibration."
@@ -240,7 +264,7 @@ struct PipetteCalibrationState: Sendable, Equatable {
         case .adjustingTip:
             return "Move the red tip marker onto the real pipette tip, then save the offset."
         case .complete:
-            return "Calibration complete. Live tip tracking uses the grip pose and visible fingertip shaft."
+            return "Calibration complete. Live tip tracking uses the visible grip pose when available."
         case .failed:
             return errorMessage ?? "Calibration failed. Reset and try again."
         }
@@ -248,6 +272,7 @@ struct PipetteCalibrationState: Sendable, Equatable {
 
     static let idle = PipetteCalibrationState(
         selectedHand: nil,
+        isTipAttachmentConfirmed: false,
         step: .handNotSelected,
         restSampleCount: 0,
         pressedSampleCount: 0,
@@ -276,9 +301,9 @@ enum PipetteInputTrackingStatus: Sendable, Equatable {
         case .waitingForHand:
             return "Waiting for the selected pipette hand."
         case .calibrating:
-            return "Collecting thumb calibration samples."
+            return "Collecting pipette calibration samples."
         case .ready:
-            return "Thumb-press detection is active."
+            return "Pipette input tracking is active."
         case .unavailable(let message):
             return message
         }
@@ -317,6 +342,11 @@ struct PipettePressState: Sendable, Equatable {
     var pressEndedAt: Date?
     var pressCount: Int
     var currentTravel: Float?
+    var isTipEstimateFrozen: Bool
+    var activeButton: PipetteButtonID?
+    var releasedButton: PipetteButtonID?
+    var activeButtonSource: PipetteButtonInputSource?
+    var releasedButtonSource: PipetteButtonInputSource?
 
     static let idle = PipettePressState(
         selectedHand: nil,
@@ -333,7 +363,12 @@ struct PipettePressState: Sendable, Equatable {
         pressBeganAt: nil,
         pressEndedAt: nil,
         pressCount: 0,
-        currentTravel: nil
+        currentTravel: nil,
+        isTipEstimateFrozen: false,
+        activeButton: nil,
+        releasedButton: nil,
+        activeButtonSource: nil,
+        releasedButtonSource: nil
     )
 }
 
